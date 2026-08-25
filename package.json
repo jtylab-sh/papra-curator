@@ -13,9 +13,12 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "pretest": "prisma generate --no-hints"
   },
-  "//": "devDependencies are for type-checking, linting and formatting ONLY. The service itself has no runtime dependencies and no build step: Node 24 runs the TypeScript directly.",
+  "//": "The service depends on Prisma at runtime and needs `prisma generate` before it runs. eslint, prettier and typescript are dev-only and never reach the image.",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
@@ -24,5 +27,10 @@
     "prettier": "^3.9.6",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.68.0"
+  },
+  "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "prisma": "^7.10.0"
   }
 }

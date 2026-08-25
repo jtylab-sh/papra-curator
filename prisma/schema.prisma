@@ -1,0 +1,38 @@
+// The state DB: what this service has already decided and paid for, one row per
+// document and one per (document, stage). Papra's own database is separate and
+// opened read-only; nothing here touches it.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Document {
+  docId         String   @id @map("doc_id")
+  firstSeen     DateTime @default(now()) @map("first_seen")
+  contentSha256 String?  @map("content_sha256")
+  originalName  String?  @map("original_name")
+
+  @@map("documents")
+}
+
+/// One row per (document, stage). `promptVersion` is the capability Papra lacks:
+/// bump it in config and the next sweep re-runs that stage everywhere, so an
+/// improved prompt reaches documents that were already processed.
+model Stage {
+  docId         String    @map("doc_id")
+  stage         String
+  status        String // done | error | skipped
+  promptVersion String?   @map("prompt_version")
+  doneAt        DateTime? @map("done_at")
+  attempts      Int       @default(0)
+  lastError     String?   @map("last_error")
+  result        String? // json: what we decided or applied
+
+  @@id([docId, stage])
+  @@index([stage, status])
+  @@map("stages")
+}

@@ -14,12 +14,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      # Runs with no dependencies installed, exactly as the image does.
-      - name: Test
-        run: node --test 'src/*.test.ts'
-      # All dev-only: the service has no runtime dependencies and is never built.
-      - name: Install dev tooling
+      - name: Install
         run: npm ci
+      # `npm test` generates the Prisma client first; everything below needs it.
+      - name: Test
+        run: npm test
       - name: Type-check
         run: npm run typecheck
       - name: Lint

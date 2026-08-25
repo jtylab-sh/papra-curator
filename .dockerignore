@@ -6,3 +6,4 @@ LICENSE
 compose.example.yaml
 config.toml
 state/
+src/generated

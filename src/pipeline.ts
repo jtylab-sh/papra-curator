@@ -76,7 +76,7 @@ export async function runTaggingAndRename(
       if (!dryRun) await ports.applyTag(doc.id, tagId);
       applied.push(tagName);
     }
-    state.setStage(doc.id, "tagging", "done", config.tagging.promptVersion, {
+    await state.setStage(doc.id, "tagging", "done", config.tagging.promptVersion, {
       result: { tags: applied },
       dryRun,
     });
@@ -95,7 +95,7 @@ export async function runTaggingAndRename(
     }
     // Recorded even when skipped, and the proposal is stored: `--apply-renames`
     // can then write these through later with no further model call.
-    state.setStage(
+    await state.setStage(
       doc.id,
       "renaming",
       renameDry ? "skipped" : "done",
@@ -138,17 +138,18 @@ export async function processDocument(
     ports.log(`  ${doc.name.slice(0, 50)}: no extracted content yet, leaving for the next sweep`);
     return;
   }
-  if (!dryRun) state.recordDocument(doc.id, doc.content, doc.originalName);
+  if (!dryRun) await state.recordDocument(doc.id, doc.content, doc.originalName);
 
   const maxAttempts = config.model.maxAttempts;
   const catalogueStages: Stage[] = [];
   if (config.tagging.enabled) catalogueStages.push("tagging");
   if (config.renaming.enabled) catalogueStages.push("renaming");
-  const needsCatalogue =
-    force ||
-    catalogueStages.some((stage) =>
+  const staleStages = await Promise.all(
+    catalogueStages.map((stage) =>
       state.stageNeedsRun(doc.id, stage, config[stage].promptVersion, maxAttempts),
-    );
+    ),
+  );
+  const needsCatalogue = force || staleStages.some(Boolean);
 
   let applied = ports.documentTags(doc.id);
   if (needsCatalogue) {
@@ -161,7 +162,7 @@ export async function processDocument(
     } catch (error) {
       const message = String((error as Error).message ?? error).slice(0, 400);
       for (const stage of catalogueStages) {
-        state.setStage(doc.id, stage, "error", config[stage].promptVersion, {
+        await state.setStage(doc.id, stage, "error", config[stage].promptVersion, {
           error: message,
           dryRun,
         });
@@ -178,7 +179,7 @@ export async function processDocument(
   if (!applied.some((tag) => wanted.has(tag.toLowerCase()))) return;
   if (
     !force &&
-    !state.stageNeedsRun(doc.id, "flights", config.flights.promptVersion, maxAttempts)
+    !(await state.stageNeedsRun(doc.id, "flights", config.flights.promptVersion, maxAttempts))
   ) {
     return;
   }
@@ -191,7 +192,7 @@ export async function processDocument(
       options.ownerUserId ?? "",
       dryRun || config.flights.dryRun,
     );
-    state.setStage(doc.id, "flights", "done", config.flights.promptVersion, {
+    await state.setStage(doc.id, "flights", "done", config.flights.promptVersion, {
       result: { added },
       dryRun,
     });
@@ -203,7 +204,7 @@ export async function processDocument(
     }
   } catch (error) {
     const message = String((error as Error).message ?? error).slice(0, 400);
-    state.setStage(doc.id, "flights", "error", config.flights.promptVersion, {
+    await state.setStage(doc.id, "flights", "error", config.flights.promptVersion, {
       error: message,
       dryRun,
     });
@@ -226,7 +227,7 @@ export async function applyPendingRenames(
   options: { dryRun?: boolean; limit?: number } = {},
 ): Promise<number> {
   const dryRun = options.dryRun ?? false;
-  let proposals = state.pendingRenames();
+  let proposals = await state.pendingRenames();
   if (options.limit && options.limit > 0) proposals = proposals.slice(0, options.limit);
   ports.log(`${proposals.length} stored rename(s) to apply${dryRun ? " (dry run)" : ""}`);
 
@@ -235,7 +236,7 @@ export async function applyPendingRenames(
     try {
       if (!dryRun) {
         await ports.renameDocument(proposal.docId, proposal.to);
-        state.setStage(proposal.docId, "renaming", "done", config.renaming.promptVersion, {
+        await state.setStage(proposal.docId, "renaming", "done", config.renaming.promptVersion, {
           result: { from: proposal.from, to: proposal.to, applied: true },
         });
       }

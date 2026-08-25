@@ -1,36 +1,20 @@
 /**
- * Per-document tracking DB — this service's own SQLite, one row per document
- * and one row per (document, stage).
+ * Per-document tracking DB — this service's own SQLite file, one row per
+ * document and one per (document, stage), reached through Prisma.
  *
- * `prompt_version` on each stage is the capability Papra structurally lacks:
+ * `promptVersion` on each stage is the capability Papra structurally lacks:
  * bump it in config and the next sweep re-runs that stage everywhere, so an
  * improved prompt reaches documents that were already processed.
+ *
+ * Papra's own database is a different file, opened read-only elsewhere. Nothing
+ * here touches it.
  */
 
-import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaClient } from "./generated/prisma/client.ts";
 import type { Stage } from "./config.ts";
-
-const SCHEMA = `
-create table if not exists documents (
-  doc_id            text primary key,
-  first_seen        text not null,
-  content_sha256    text,
-  original_name     text
-);
-create table if not exists stages (
-  doc_id            text not null,
-  stage             text not null,
-  status            text not null,          -- done | error | skipped
-  prompt_version    text,
-  done_at           text,
-  attempts          integer not null default 0,
-  last_error        text,
-  result            text,                   -- json: what we decided/applied
-  primary key (doc_id, stage)
-);
-create index if not exists stages_status on stages (stage, status);
-`;
 
 export type StageStatus = "done" | "error" | "skipped";
 
@@ -48,45 +32,35 @@ export interface RenameProposal {
 }
 
 export class State {
-  private readonly db: DatabaseSync;
+  private readonly prisma: PrismaClient;
 
-  constructor(path: string) {
-    this.db = new DatabaseSync(path);
-    this.db.exec(SCHEMA);
+  /** `url` is a Prisma SQLite URL: `file:/state/curator.db`, or `file::memory:`. */
+  constructor(url: string) {
+    this.prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
   }
 
-  close(): void {
-    this.db.close();
+  async close(): Promise<void> {
+    await this.prisma.$disconnect();
   }
 
-  recordDocument(docId: string, content: string, originalName: string): void {
-    this.db
-      .prepare(
-        `insert or ignore into documents (doc_id, first_seen, content_sha256, original_name)
-         values (?, ?, ?, ?)`,
-      )
-      .run(
-        docId,
-        new Date().toISOString(),
-        createHash("sha256")
-          .update(content ?? "")
-          .digest("hex"),
-        originalName,
-      );
+  async recordDocument(docId: string, content: string, originalName: string): Promise<void> {
+    const contentSha256 = createHash("sha256")
+      .update(content ?? "")
+      .digest("hex");
+    // Insert-or-ignore: the first sighting is the one worth keeping.
+    await this.prisma.document.upsert({
+      where: { docId },
+      create: { docId, contentSha256, originalName },
+      update: {},
+    });
   }
 
-  stageRow(docId: string, stage: Stage): StageRow | null {
-    const row = this.db
-      .prepare(
-        "select status, prompt_version, attempts, result from stages where doc_id = ? and stage = ?",
-      )
-      .get(docId, stage) as
-      | { status: string; prompt_version: string | null; attempts: number; result: string | null }
-      | undefined;
-    if (!row) return null;
+  async stageRow(docId: string, stage: Stage): Promise<StageRow | null> {
+    const row = await this.prisma.stage.findUnique({ where: { docId_stage: { docId, stage } } });
+    if (row === null) return null;
     return {
       status: row.status as StageStatus,
-      promptVersion: row.prompt_version,
+      promptVersion: row.promptVersion,
       attempts: row.attempts,
       result: row.result ? JSON.parse(row.result) : null,
     };
@@ -99,8 +73,13 @@ export class State {
    * rename records, and re-running it would spend a model call to reach the
    * same conclusion.
    */
-  stageNeedsRun(docId: string, stage: Stage, promptVersion: string, maxAttempts: number): boolean {
-    const row = this.stageRow(docId, stage);
+  async stageNeedsRun(
+    docId: string,
+    stage: Stage,
+    promptVersion: string,
+    maxAttempts: number,
+  ): Promise<boolean> {
+    const row = await this.stageRow(docId, stage);
     if (row === null) return true;
     if (row.status === "done" || row.status === "skipped") {
       return row.promptVersion !== promptVersion;
@@ -115,38 +94,28 @@ export class State {
    * applied it would make the following real run skip the work entirely, so the
    * dry run would silently consume the change it was only meant to preview.
    */
-  setStage(
+  async setStage(
     docId: string,
     stage: Stage,
     status: StageStatus,
     promptVersion: string,
     options: { result?: unknown; error?: string; dryRun?: boolean } = {},
-  ): void {
+  ): Promise<void> {
     if (options.dryRun) return;
-    const previous = this.stageRow(docId, stage);
-    const attempts = (previous?.attempts ?? 0) + 1;
-    this.db
-      .prepare(
-        `insert into stages (doc_id, stage, status, prompt_version, done_at, attempts, last_error, result)
-         values (?, ?, ?, ?, ?, ?, ?, ?)
-         on conflict(doc_id, stage) do update set
-           status = excluded.status,
-           prompt_version = excluded.prompt_version,
-           done_at = excluded.done_at,
-           attempts = excluded.attempts,
-           last_error = excluded.last_error,
-           result = excluded.result`,
-      )
-      .run(
-        docId,
-        stage,
-        status,
-        promptVersion,
-        new Date().toISOString(),
-        attempts,
-        options.error ?? null,
-        options.result === undefined ? null : JSON.stringify(options.result),
-      );
+    const previous = await this.stageRow(docId, stage);
+    const row = {
+      status,
+      promptVersion,
+      doneAt: new Date(),
+      attempts: (previous?.attempts ?? 0) + 1,
+      lastError: options.error ?? null,
+      result: options.result === undefined ? null : JSON.stringify(options.result),
+    };
+    await this.prisma.stage.upsert({
+      where: { docId_stage: { docId, stage } },
+      create: { docId, stage, ...row },
+      update: row,
+    });
   }
 
   /**
@@ -157,10 +126,11 @@ export class State {
    * the names were already decided and stored, and `--apply-renames` writes
    * them through with no model call at all.
    */
-  pendingRenames(): RenameProposal[] {
-    const rows = this.db
-      .prepare("select doc_id, result from stages where stage = 'renaming' and status = 'skipped'")
-      .all() as { doc_id: string; result: string | null }[];
+  async pendingRenames(): Promise<RenameProposal[]> {
+    const rows = await this.prisma.stage.findMany({
+      where: { stage: "renaming", status: "skipped" },
+      select: { docId: true, result: true },
+    });
     const proposals: RenameProposal[] = [];
     for (const row of rows) {
       if (!row.result) continue;
@@ -173,8 +143,31 @@ export class State {
       const from = typeof parsed.from === "string" ? parsed.from : "";
       const to = typeof parsed.to === "string" ? parsed.to : "";
       if (!to || to === from) continue;
-      proposals.push({ docId: row.doc_id, from, to });
+      proposals.push({ docId: row.docId, from, to });
     }
     return proposals;
+  }
+
+  /** Raw passthrough, for `createSchema` below. */
+  async execute(sql: string): Promise<void> {
+    await this.prisma.$executeRawUnsafe(sql);
+  }
+}
+
+/**
+ * Apply every migration to an EMPTY database, for tests and for nothing else.
+ *
+ * It reads the same `prisma/migrations` SQL that ships to production, so the
+ * two cannot drift, but it keeps no ledger of what it has applied — a real
+ * deployment upgrades with `prisma migrate deploy`, which does.
+ */
+export async function createSchema(state: State): Promise<void> {
+  const migrations = new URL("../prisma/migrations/", import.meta.url);
+  for (const name of readdirSync(migrations).sort()) {
+    if (!name.match(/^\d/)) continue;
+    const sql = readFileSync(new URL(`${name}/migration.sql`, migrations), "utf8");
+    for (const statement of sql.split(";")) {
+      if (statement.trim()) await state.execute(statement);
+    }
   }
 }

@@ -21,7 +21,7 @@ import { describe, it, beforeEach } from "node:test";
 
 import { parseToml } from "./toml.ts";
 import { parseConfig, type Config } from "./config.ts";
-import { State } from "./state.ts";
+import { State, createSchema } from "./state.ts";
 import { composeName, slugify, splitExtension } from "./naming.ts";
 import { catalogueSchema } from "./catalogue.ts";
 import {
@@ -193,7 +193,7 @@ function segment(overrides: Partial<Segment> = {}): Segment {
 // --------------------------------------------------------------------------- //
 
 describe("toml", () => {
-  it("reads the shapes the config actually uses", () => {
+  it("reads the shapes the config actually uses", async () => {
     const parsed = parseToml(`
 # comment
 [a]
@@ -223,15 +223,15 @@ nested = "deep"
     });
   });
 
-  it("refuses to shadow a scalar with a table of the same name", () => {
+  it("refuses to shadow a scalar with a table of the same name", async () => {
     assert.throws(() => parseToml("[a]\nb = true\n[a.b]\nx = 1"), /b is a value, not a table/);
   });
 
-  it("keeps a # that is inside a string", () => {
+  it("keeps a # that is inside a string", async () => {
     assert.deepEqual(parseToml('[a]\nk = "we#ird"'), { a: { k: "we#ird" } });
   });
 
-  it("throws rather than silently skipping a line it cannot parse", () => {
+  it("throws rather than silently skipping a line it cannot parse", async () => {
     // The dangerous failure mode: a config parser that ignores what it does not
     // understand can turn dry_run = true into an unset (live) run.
     assert.throws(() => parseToml("[a]\nk = nonsense"), /line 2/);
@@ -243,7 +243,7 @@ nested = "deep"
 });
 
 describe("config", () => {
-  it("rejects a flights handler that cannot enforce the owner rule", () => {
+  it("rejects a flights handler that cannot enforce the owner rule", async () => {
     assert.throws(
       () =>
         parseConfig(
@@ -254,14 +254,14 @@ describe("config", () => {
     );
   });
 
-  it("rejects an enabled flights handler with no trigger tags", () => {
+  it("rejects an enabled flights handler with no trigger tags", async () => {
     assert.throws(
       () => parseConfig(CONFIG_TOML.replace('tags = ["viaggi"]', "tags = []"), {}),
       /tags must not be empty/,
     );
   });
 
-  it("defaults renaming.dry_run to true when the key is absent", () => {
+  it("defaults renaming.dry_run to true when the key is absent", async () => {
     const parsed = parseConfig(
       CONFIG_TOML.replace("dry_run = false\n\n[handlers.flights]", "\n[handlers.flights]"),
       {},
@@ -269,7 +269,7 @@ describe("config", () => {
     assert.equal(parsed.renaming.dryRun, true, "an unset dry_run must not mean rename everything");
   });
 
-  it("defaults the flights handler off", () => {
+  it("defaults the flights handler off", async () => {
     const parsed = parseConfig(
       CONFIG_TOML.replace(
         'enabled = true\nprompt_version = "1"\ntags',
@@ -280,7 +280,7 @@ describe("config", () => {
     assert.equal(parsed.flights.enabled, false);
   });
 
-  it("takes identity from the environment so config.toml carries none", () => {
+  it("takes identity from the environment so config.toml carries none", async () => {
     // config.toml ships with these blank; compose supplies them.
     const blank = CONFIG_TOML.replace('organization_id = "org_test"', 'organization_id = ""')
       .replace('airtrail_url = "https://fly.example.com"', 'airtrail_url = ""')
@@ -296,12 +296,12 @@ describe("config", () => {
     assert.deepEqual(parsed.flights.ownerNames, ["Jane Doe", "DOE, JANE", "DOE/JANE"]);
   });
 
-  it("lets the environment win over a value in the file", () => {
+  it("lets the environment win over a value in the file", async () => {
     const parsed = parseConfig(CONFIG_TOML, { PAPRA_ORGANIZATION_ID: "org_override" });
     assert.equal(parsed.papra.organizationId, "org_override");
   });
 
-  it("ignores an unset or blank variable rather than blanking the file value", () => {
+  it("ignores an unset or blank variable rather than blanking the file value", async () => {
     const parsed = parseConfig(CONFIG_TOML, {
       PAPRA_ORGANIZATION_ID: "   ",
       AIRTRAIL_URL: undefined,
@@ -310,7 +310,7 @@ describe("config", () => {
     assert.equal(parsed.flights.airtrailUrl, "https://fly.example.com");
   });
 
-  it("names both places when an identity value is missing everywhere", () => {
+  it("names both places when an identity value is missing everywhere", async () => {
     const blank = CONFIG_TOML.replace('organization_id = "org_test"', 'organization_id = ""');
     assert.throws(
       () => parseConfig(blank, {}),
@@ -318,7 +318,7 @@ describe("config", () => {
     );
   });
 
-  it("accepts a numeric prompt_version so it cannot silently fail to match", () => {
+  it("accepts a numeric prompt_version so it cannot silently fail to match", async () => {
     const parsed = parseConfig(
       CONFIG_TOML.replace(
         '[tagging]\nenabled = true\nprompt_version = "1"',
@@ -333,7 +333,7 @@ describe("config", () => {
 describe("filenames", () => {
   const cfg = config();
 
-  it("composes from fields", () => {
+  it("composes from fields", async () => {
     assert.equal(
       composeName(
         cfg,
@@ -344,7 +344,7 @@ describe("filenames", () => {
     );
   });
 
-  it("leaves no dangling separator when a field is empty", () => {
+  it("leaves no dangling separator when a field is empty", async () => {
     assert.equal(
       composeName(
         cfg,
@@ -355,7 +355,7 @@ describe("filenames", () => {
     );
   });
 
-  it("cannot be made to produce a path or a traversal", () => {
+  it("cannot be made to produce a path or a traversal", async () => {
     const evil = composeName(
       cfg,
       { date: "../../etc", party: "a/b\\c", doctype: "x", detail: "" },
@@ -367,11 +367,11 @@ describe("filenames", () => {
     );
   });
 
-  it("returns null when every field is empty rather than a bare extension", () => {
+  it("returns null when every field is empty rather than a bare extension", async () => {
     assert.equal(composeName(cfg, { date: "", party: "", doctype: "", detail: "" }, ".pdf"), null);
   });
 
-  it("truncates without leaving a trailing separator", () => {
+  it("truncates without leaving a trailing separator", async () => {
     const tight = config((draft) => {
       draft.renaming.maxLength = 20;
     });
@@ -386,24 +386,24 @@ describe("filenames", () => {
     );
   });
 
-  it("slugifies accents and punctuation", () => {
+  it("slugifies accents and punctuation", async () => {
     assert.equal(slugify("Enel Energia S.p.A."), "enel-energia-s-p-a");
     assert.equal(slugify("Città  di  Milano"), "citta-di-milano");
   });
 
-  it("finds the extension, or reports none", () => {
+  it("finds the extension, or reports none", async () => {
     assert.equal(splitExtension("Scan_2024.PDF"), ".PDF");
     assert.equal(splitExtension("noext"), "");
   });
 });
 
 describe("tag schema", () => {
-  it("pins the vocabulary as an enum when new tags are not allowed", () => {
+  it("pins the vocabulary as an enum when new tags are not allowed", async () => {
     const schema = catalogueSchema(["a", "b"], false) as any;
     assert.deepEqual(schema.properties.tags.items.enum, ["a", "b"]);
   });
 
-  it("leaves tags open when new ones are allowed", () => {
+  it("leaves tags open when new ones are allowed", async () => {
     const schema = catalogueSchema(["a"], true) as any;
     assert.equal(schema.properties.tags.items.enum, undefined);
   });
@@ -418,18 +418,18 @@ describe("webhook signature", () => {
     "v1," +
     createHmac("sha256", secret).update(`${webhookId}.${timestamp}.${body}`).digest("base64");
 
-  it("accepts Papra's scheme", () => {
+  it("accepts Papra's scheme", async () => {
     assert.ok(verifySignature(secret, webhookId, timestamp, body, good));
   });
 
-  it("rejects a tampered body, a wrong secret, and swapped headers", () => {
+  it("rejects a tampered body, a wrong secret, and swapped headers", async () => {
     assert.ok(!verifySignature(secret, webhookId, timestamp, body + " ", good));
     assert.ok(!verifySignature("wrong", webhookId, timestamp, body, good));
     assert.ok(!verifySignature(secret, "wbh_2", timestamp, body, good));
     assert.ok(!verifySignature(secret, webhookId, "1700000001", body, good));
   });
 
-  it("rejects an unknown version, garbage, and an empty secret", () => {
+  it("rejects an unknown version, garbage, and an empty secret", async () => {
     assert.ok(!verifySignature(secret, webhookId, timestamp, body, "v2," + good.split(",")[1]));
     assert.ok(!verifySignature(secret, webhookId, timestamp, body, "garbage"));
     assert.ok(!verifySignature(secret, webhookId, timestamp, body, ""));
@@ -437,7 +437,7 @@ describe("webhook signature", () => {
     assert.ok(!verifySignature("", webhookId, timestamp, body, good));
   });
 
-  it("finds the document id in both payload shapes", () => {
+  it("finds the document id in both payload shapes", async () => {
     assert.equal(documentIdFrom({ payload: { document: { id: "d1" } } }), "d1");
     assert.equal(documentIdFrom({ payload: { documentId: "d2" } }), "d2");
     assert.equal(documentIdFrom({ payload: {} }), null);
@@ -446,57 +446,61 @@ describe("webhook signature", () => {
 
 describe("stage tracking", () => {
   let state: State;
-  beforeEach(() => {
-    state = new State(":memory:");
+  beforeEach(async () => {
+    state = new State("file::memory:");
+    await createSchema(state);
   });
 
-  it("re-queues a done stage when the prompt version changes", () => {
-    assert.ok(state.stageNeedsRun("doc1", "tagging", "1", 3));
-    state.setStage("doc1", "tagging", "done", "1", { result: { tags: ["x"] } });
-    assert.ok(!state.stageNeedsRun("doc1", "tagging", "1", 3));
-    assert.ok(state.stageNeedsRun("doc1", "tagging", "2", 3), "a prompt bump must re-queue");
+  it("re-queues a done stage when the prompt version changes", async () => {
+    assert.ok(await state.stageNeedsRun("doc1", "tagging", "1", 3));
+    await state.setStage("doc1", "tagging", "done", "1", { result: { tags: ["x"] } });
+    assert.ok(!(await state.stageNeedsRun("doc1", "tagging", "1", 3)));
+    assert.ok(await state.stageNeedsRun("doc1", "tagging", "2", 3), "a prompt bump must re-queue");
   });
 
-  it("persists nothing on a dry run", () => {
-    state.setStage("doc1", "renaming", "done", "1", { dryRun: true });
-    assert.equal(state.stageRow("doc1", "renaming"), null, "a dry run must leave no trace");
+  it("persists nothing on a dry run", async () => {
+    await state.setStage("doc1", "renaming", "done", "1", { dryRun: true });
+    assert.equal(await state.stageRow("doc1", "renaming"), null, "a dry run must leave no trace");
   });
 
-  it("retries an error up to the cap, then stops", () => {
-    state.setStage("doc1", "flights", "error", "1", { error: "boom" });
-    assert.ok(state.stageNeedsRun("doc1", "flights", "1", 3));
-    state.setStage("doc1", "flights", "error", "1", { error: "boom" });
-    state.setStage("doc1", "flights", "error", "1", { error: "boom" });
-    assert.ok(!state.stageNeedsRun("doc1", "flights", "1", 3), "must stop at max_attempts");
+  it("retries an error up to the cap, then stops", async () => {
+    await state.setStage("doc1", "flights", "error", "1", { error: "boom" });
+    assert.ok(await state.stageNeedsRun("doc1", "flights", "1", 3));
+    await state.setStage("doc1", "flights", "error", "1", { error: "boom" });
+    await state.setStage("doc1", "flights", "error", "1", { error: "boom" });
+    assert.ok(!(await state.stageNeedsRun("doc1", "flights", "1", 3)), "must stop at max_attempts");
   });
 
-  it("treats a skipped stage as settled, not as a retry", () => {
-    state.setStage("doc1", "renaming", "skipped", "1", { result: { from: "a", to: "b" } });
-    assert.ok(!state.stageNeedsRun("doc1", "renaming", "1", 3));
+  it("treats a skipped stage as settled, not as a retry", async () => {
+    await state.setStage("doc1", "renaming", "skipped", "1", { result: { from: "a", to: "b" } });
+    assert.ok(!(await state.stageNeedsRun("doc1", "renaming", "1", 3)));
   });
 
-  it("survives being reopened", () => {
-    const shared = new State(":memory:");
-    shared.recordDocument("doc1", "text", "a.pdf");
-    shared.setStage("doc1", "tagging", "done", "1");
-    assert.equal(shared.stageRow("doc1", "tagging")?.status, "done");
+  it("survives being reopened", async () => {
+    const shared = new State("file::memory:");
+    await createSchema(shared);
+    await shared.recordDocument("doc1", "text", "a.pdf");
+    await shared.setStage("doc1", "tagging", "done", "1");
+    assert.equal((await shared.stageRow("doc1", "tagging"))?.status, "done");
   });
 
-  it("lists only pending renames that would actually change the name", () => {
-    state.setStage("d1", "renaming", "skipped", "1", {
+  it("lists only pending renames that would actually change the name", async () => {
+    await state.setStage("d1", "renaming", "skipped", "1", {
       result: { from: "old.pdf", to: "new.pdf" },
     });
-    state.setStage("d2", "renaming", "skipped", "1", {
+    await state.setStage("d2", "renaming", "skipped", "1", {
       result: { from: "same.pdf", to: "same.pdf" },
     });
-    state.setStage("d3", "renaming", "skipped", "1", { result: { from: "x.pdf", to: null } });
-    state.setStage("d4", "renaming", "done", "1", { result: { from: "a.pdf", to: "b.pdf" } });
-    assert.deepEqual(state.pendingRenames(), [{ docId: "d1", from: "old.pdf", to: "new.pdf" }]);
+    await state.setStage("d3", "renaming", "skipped", "1", { result: { from: "x.pdf", to: null } });
+    await state.setStage("d4", "renaming", "done", "1", { result: { from: "a.pdf", to: "b.pdf" } });
+    assert.deepEqual(await state.pendingRenames(), [
+      { docId: "d1", from: "old.pdf", to: "new.pdf" },
+    ]);
   });
 });
 
 describe("flight conversion", () => {
-  it("normalises flight numbers and airlines", () => {
+  it("normalises flight numbers and airlines", async () => {
     assert.equal(normFlightNumber("BR 0096"), "BR96");
     assert.equal(icaoFor("W6 4312"), "WZZ");
     assert.equal(icaoFor("CA446"), "CCA");
@@ -504,7 +508,7 @@ describe("flight conversion", () => {
     assert.equal(keyOf("2024-07-14T10:00", "mxp", "otp"), "2024-07-14|MXP|OTP");
   });
 
-  it("gives a guest an explicit null userId", () => {
+  it("gives a guest an explicit null userId", async () => {
     // AirTrail 400s with invalid_type on an omitted userId key.
     const body = toAirtrail(segment({ guests: ["sara capogreco"] }), OWNER);
     const guest = body.passengers.find((p) => p.guestName)!;
@@ -515,20 +519,20 @@ describe("flight conversion", () => {
     assert.deepEqual(checkFlight(body, OWNER), []);
   });
 
-  it("rejects a flight the owner is not a passenger on", () => {
+  it("rejects a flight the owner is not a passenger on", async () => {
     const body = toAirtrail(segment({ guests: ["someone else"] }), OWNER);
     body.passengers = body.passengers.filter((p) => p.guestName); // owner removed
     assert.ok(checkFlight(body, OWNER).length > 0, "owner-absent flight must be rejected");
   });
 
-  it("rejects malformed routes", () => {
+  it("rejects malformed routes", async () => {
     const body = toAirtrail(segment(), OWNER);
     assert.ok(checkFlight({ ...body, from: "Milan" }, OWNER).length > 0);
     assert.ok(checkFlight({ ...body, to: body.from }, OWNER).length > 0);
     assert.ok(checkFlight({ ...body, departure: "26/10/2024" }, OWNER).length > 0);
   });
 
-  it("drops an invalid seat class instead of sending it", () => {
+  it("drops an invalid seat class instead of sending it", async () => {
     const body = toAirtrail(segment({ seatClass: "coach" }), OWNER);
     assert.equal(body.passengers[0].seatClass, undefined);
     assert.equal(
@@ -537,7 +541,7 @@ describe("flight conversion", () => {
     );
   });
 
-  it("catches a one-day model date slip on the same flight number", () => {
+  it("catches a one-day model date slip on the same flight number", async () => {
     const logged = [
       { flightNumber: "TK1895", date: "2026-10-31" },
       { flightNumber: "FR4475", date: "2022-06-24" },
@@ -562,8 +566,9 @@ describe("pipeline", () => {
   let state: State;
   let ports: FakePorts;
 
-  beforeEach(() => {
-    state = new State(":memory:");
+  beforeEach(async () => {
+    state = new State("file::memory:");
+    await createSchema(state);
     ports = new FakePorts();
   });
 
@@ -579,7 +584,7 @@ describe("pipeline", () => {
     assert.deepEqual(ports.modelCalls, [], "spend = false must mean no model call");
     assert.deepEqual(ports.appliedTags, []);
     assert.equal(
-      state.stageRow("doc1", "tagging"),
+      await state.stageRow("doc1", "tagging"),
       null,
       "no attempt may be recorded, or documents park before they are ever tried",
     );
@@ -636,8 +641,12 @@ describe("pipeline", () => {
     assert.equal(ports.appliedTags.length, 0);
     assert.equal(ports.renames.length, 0);
     assert.equal(ports.savedFlights.length, 0);
-    assert.equal(state.stageRow("doc1", "tagging"), null, "a dry run must not mark work done");
-    assert.equal(state.stageRow("doc1", "renaming"), null);
+    assert.equal(
+      await state.stageRow("doc1", "tagging"),
+      null,
+      "a dry run must not mark work done",
+    );
+    assert.equal(await state.stageRow("doc1", "renaming"), null);
   });
 
   it("is a no-op on the second run", async () => {
@@ -663,26 +672,26 @@ describe("pipeline", () => {
     ports.failOn["flights"] = "airtrail is down";
     await run(config());
     assert.equal(
-      state.stageRow("doc1", "tagging")?.status,
+      (await state.stageRow("doc1", "tagging"))?.status,
       "done",
       "one failure must not cost the tags",
     );
-    assert.equal(state.stageRow("doc1", "flights")?.status, "error");
+    assert.equal((await state.stageRow("doc1", "flights"))?.status, "error");
   });
 
   it("records an error for the catalogue stages when the model fails", async () => {
     ports.failOn["catalogue"] = "429 rate limited";
     await run(config());
-    assert.equal(state.stageRow("doc1", "tagging")?.status, "error");
-    assert.equal(state.stageRow("doc1", "renaming")?.status, "error");
-    assert.match(String(state.stageRow("doc1", "tagging")?.result ?? ""), /^$|null/);
+    assert.equal((await state.stageRow("doc1", "tagging"))?.status, "error");
+    assert.equal((await state.stageRow("doc1", "renaming"))?.status, "error");
+    assert.match(String((await state.stageRow("doc1", "tagging"))?.result ?? ""), /^$|null/);
   });
 
   it("leaves a document with no extracted content for the next sweep", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"]);
     await run(config(), document({ content: "   " }));
     assert.deepEqual(ports.modelCalls, [], "no content means nothing to classify yet");
-    assert.equal(state.stageRow("doc1", "tagging"), null);
+    assert.equal(await state.stageRow("doc1", "tagging"), null);
   });
 
   it("skips the rename call when renaming.dry_run is on but stores the proposal", async () => {
@@ -694,7 +703,7 @@ describe("pipeline", () => {
       }),
     );
     assert.equal(ports.renames.length, 0);
-    const row = state.stageRow("doc1", "renaming");
+    const row = await state.stageRow("doc1", "renaming");
     assert.equal(row?.status, "skipped");
     assert.equal((row?.result as any).to, "2024-10-26_enel_bolletta.pdf");
   });
@@ -712,8 +721,12 @@ describe("pipeline", () => {
     assert.equal(applied, 1);
     assert.deepEqual(ports.modelCalls, [], "the names were already decided and paid for");
     assert.deepEqual(ports.renames, [{ docId: "doc1", name: "2024-10-26_enel_bolletta.pdf" }]);
-    assert.equal(state.stageRow("doc1", "renaming")?.status, "done");
-    assert.deepEqual(state.pendingRenames(), [], "an applied rename must not be offered twice");
+    assert.equal((await state.stageRow("doc1", "renaming"))?.status, "done");
+    assert.deepEqual(
+      await state.pendingRenames(),
+      [],
+      "an applied rename must not be offered twice",
+    );
   });
 
   it("does not mark a rename done when Papra rejects it", async () => {
@@ -726,7 +739,7 @@ describe("pipeline", () => {
     ports.failOn["rename"] = "409 conflict";
     await applyPendingRenames(cfg, state, ports);
     assert.equal(
-      state.stageRow("doc1", "renaming")?.status,
+      (await state.stageRow("doc1", "renaming"))?.status,
       "skipped",
       "a failed rename stays pending",
     );
@@ -764,7 +777,7 @@ describe("spend brake", () => {
     );
   });
 
-  it("defaults [model] spend to false when the key is absent", () => {
+  it("defaults [model] spend to false when the key is absent", async () => {
     const parsed = parseConfig(CONFIG_TOML.replace("spend = true\n", ""), {});
     assert.equal(parsed.model.spend, false, "an unset spend must not mean spend freely");
   });
@@ -784,12 +797,12 @@ describe("spend brake", () => {
 });
 
 describe("cli", () => {
-  it("has no default action", () => {
+  it("has no default action", async () => {
     const args = parseArgs([]);
     assert.ok(!args.once && !args.serve && !args.applyRenames && args.doc === null);
   });
 
-  it("parses --limit, the bound on how many documents a run touches", () => {
+  it("parses --limit, the bound on how many documents a run touches", async () => {
     assert.equal(parseArgs(["--once", "--limit", "5"]).limit, 5);
     assert.throws(() => parseArgs(["--limit", "0"]), /positive integer/);
     assert.throws(() => parseArgs(["--limit", "all"]), /positive integer/);

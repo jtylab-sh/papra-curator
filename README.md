@@ -39,15 +39,24 @@ document:created webhook ──► queue ──► [ tag + rename ]  ← one mod
 The tag gate is the cost control: the second call only happens for documents the
 first call tagged as travel, so a typical archive costs one call per document.
 
-Reads come from Papra's SQLite, opened **read-only** — safe alongside Papra
-because it runs `journal_mode=delete`, so a reader needs no lock files. Writes go
-through Papra's **HTTP API**, never the database, since writing behind Papra's
-back would leave its full-text index stale.
+### Two databases
 
-Node 24 strips TypeScript types at load and ships `node:sqlite`, so this runs
-`.ts` files directly with **zero runtime dependencies and no build step**. The
-code you audit is byte-for-byte the code that runs. `package.json` is dev tooling
-for `npm run typecheck` only, and is not installed in the image.
+**Papra's**, read **only** — and read directly from its SQLite file rather than
+over the API, because that is the cheap way to sweep an archive. Safe alongside a
+running Papra because it uses `journal_mode=delete`, so a reader needs no lock
+files. Every **write** goes through Papra's **HTTP API**, never its database:
+writing behind its back would leave its full-text index stale.
+
+**Ours**, a SQLite file in the state volume, through **Prisma** — one row per
+document and one per (document, stage), recording what has already been decided
+and paid for. Losing it means paying the model again. The schema lives in
+[`prisma/schema.prisma`](prisma/schema.prisma) and migrations are applied at
+container start.
+
+Node 24 runs the TypeScript directly, stripping types at load, so there is no
+transpile step — but `prisma generate` is a build step, and `@prisma/client` and
+its SQLite adapter are runtime dependencies. `npm ci` is required before running
+anything from a clone.
 
 ## Install
 
@@ -229,16 +238,26 @@ production; `:latest` moves on every push. Git tags are the source of truth —
 ## Development
 
 ```bash
-node --test 'src/*.test.ts'   # no install needed
-npm ci && npm run typecheck   # dev-only tooling
+npm ci
+npm test              # generates the Prisma client first, then runs the tests
+npm run typecheck
+npm run lint          # eslint
+npm run format        # prettier
 ```
 
-61 tests, no network, no Papra, no config file — the outside world is behind one
-`Ports` interface and the state DB runs in memory. They cover the invariants
-whose failure costs money or data: no model call while `spend` is false, no
-second call for a non-travel document, nothing written by a dry run, no flight
-filed for a document the owner did not fly, no unsigned webhook accepted, no
-invented tag, no filename that is a path.
+Changing `prisma/schema.prisma` means a migration:
+
+```bash
+DATABASE_URL="file:./dev.db" npx prisma migrate dev --name what-changed
+```
+
+61 tests, no network and no Papra — the outside world is behind one `Ports`
+interface, and each test gets its own in-memory database built from the real
+migration SQL, so the tests and production cannot drift. They cover the
+invariants whose failure costs money or data: no model call while `spend` is
+false, no second call for a non-travel document, nothing written by a dry run, no
+flight filed for a document the owner did not fly, no unsigned webhook accepted,
+no invented tag, no filename that is a path.
 
 ## License
 
