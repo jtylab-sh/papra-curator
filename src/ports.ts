@@ -44,11 +44,10 @@ export function timestampedLog(message: string): void {
  * `allowSpend` is the hard stop on model spend.
  *
  * Every model call in the service goes through `askModel`, so refusing here
- * refuses all of them — a sweep, a webhook, a --dry-run, a future handler
- * nobody has written yet. It defaults to false and is turned on only by the
- * explicit `--spend` flag on the command line, never by a config file and never
- * by an environment variable: a flag has to be typed each time, whereas a
- * setting gets turned on once and then forgotten.
+ * refuses all of them — a sweep, a webhook, a --dry-run, a handler added later.
+ * It defaults to false and is turned on only by the explicit `--spend` flag on
+ * the command line, never by a config file and never by an environment
+ * variable.
  *
  * Note that --dry-run is NOT free. It asks the model and then declines to apply
  * the answer, so it costs exactly as much as a real run.

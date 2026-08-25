@@ -6,10 +6,8 @@
  *                        |
  *      tags include a flights tag?  ->  [flights]  second call  ->  AirTrail
  *
- * `reconcile` deliberately does NOT run on its own. An earlier version swept on
- * every container start, and because a cold state DB means "nothing is done
- * yet", starting the container tagged the entire archive — one model call per
- * document. Sweeps are now something you ask for.
+ * `reconcile` never runs on its own: a sweep costs one model call per document
+ * that is not already recorded done, so it happens only when asked for.
  */
 
 import type { Config, Stage } from "./config.ts";

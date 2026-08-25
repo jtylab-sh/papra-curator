@@ -7,14 +7,9 @@
  *   node src/main.ts --apply-renames           stored renames, zero model calls
  *   node src/main.ts --serve --spend           webhook receiver (long-running)
  *
- * Two independent brakes, because an accidental full-archive sweep is real
- * money:
- *
- *   1. No default action. No arguments prints usage and exits non-zero, so a
- *      container that starts by accident does nothing at all.
- *   2. No model call without `--spend`. It is a flag rather than a config key
- *      or an environment variable on purpose: a flag must be typed every time,
- *      whereas a setting is turned on once and then forgotten.
+ * No arguments prints usage and exits non-zero: there is no default action.
+ * No mode calls the model without `--spend`, which is a command-line flag only,
+ * never a config key or an environment variable.
  *
  * `--dry-run` is NOT free and does NOT imply permission: it asks the model and
  * then declines to apply the answer, costing exactly as much as a real run.
