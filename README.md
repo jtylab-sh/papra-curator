@@ -1,134 +1,102 @@
 # papra-curator
 
-Tagging, renaming and downstream handlers for [Papra](https://papra.app), owned
-by a service outside Papra so they can be retried, re-run and audited.
+LLM tagging, content-based renaming, and downstream handlers for
+[Papra](https://papra.app), run as a sidecar service.
 
-> Written by an AI agent (Claude), reviewed and run in production by a human.
+Papra's native auto-tagging makes exactly one attempt per document
+(`maxRetries=0`) and has no re-tag API, so one rate-limit error leaves a
+document permanently untagged. papra-curator owns that pipeline instead:
 
-## Why this exists
-
-Papra has native LLM auto-tagging. Three things it structurally cannot do:
-
-|                                                      | Papra                            | papra-curator               |
-| ---------------------------------------------------- | -------------------------------- | --------------------------- |
-| Retry a failed tagging call                          | No — `maxRetries=0`, one attempt | Yes, to a configurable cap  |
-| Re-tag after you improve a prompt or tag description | No, and no re-tag API            | Yes — bump `prompt_version` |
-| Decide tags and filename together                    | Tags only                        | One model call returns both |
-
-The retry gap is the sharp one: one HTTP 429 leaves a document **permanently
-untagged**, with no API to fix it.
-
-On top of that, **content-based renaming** — `scan_0043.pdf` becomes
-`2024-10-26_enel_bolletta-luce_ottobre.pdf`. Papra keeps the original in its own
-`original_name` column, which the rename API does not touch.
+- **Retries** failed model calls, up to a configurable cap.
+- **Re-runs** any stage after you improve a prompt or a tag description: bump
+  its `prompt_version` and the next sweep picks every document up again.
+- **Decides tags and filename in one model call**, so both reflect the same
+  reading of the document: `scan_0043.pdf` becomes
+  `2024-10-26_enel_bolletta-luce_ottobre.pdf`. Papra keeps the original name,
+  so a rename is always revertible.
+- **Files flights** (optional): documents tagged as travel get a second model
+  call that extracts flight segments into
+  [AirTrail](https://github.com/johanohly/AirTrail).
 
 ## How it works
 
 ```
-document:created webhook ──► queue ──► [ tag + rename ]  ← one model call
+document:created webhook ──► queue ──► [ tag + rename ]   one model call
                                               │
-                         tags include a flights tag?
+                                   travel tag applied?
                                               │
                                               ▼
-                                        [ flights ]      ← second model call
+                                        [ flights ]       second model call
                                               │
                                               ▼
                                           AirTrail
 ```
 
-The tag gate is the cost control: the second call only happens for documents the
-first call tagged as travel, so a typical archive costs one call per document.
+- One model call per document (Mistral, structured output). The second call
+  happens only for documents tagged with one of your travel tags.
+- Papra's SQLite is read **read-only**; every write goes through Papra's HTTP
+  API, so Papra's schema and full-text index stay its own business.
+- Its own state DB (a SQLite file) records every decision per document and
+  stage, which makes runs idempotent and re-runs explicit. **Back that file
+  up** — losing it means paying the model to make the same decisions again.
+- **No model call happens unless you set `spend = true`** — see
+  [Spending](#spending).
 
-### Two databases
+## Setup
 
-**Papra's**, read **only** — and read directly from its SQLite file rather than
-over the API, because that is the cheap way to sweep an archive. Safe alongside a
-running Papra because it uses `journal_mode=delete`, so a reader needs no lock
-files. Every **write** goes through Papra's **HTTP API**, never its database:
-writing behind its back would leave its full-text index stale.
+**1. Create a Papra API key** (Settings → API keys) with `documents:update`,
+`tags:read`, `tags:update` — and `tags:create` only if you enable
+`allow_new_tags`.
 
-**Ours**, a SQLite file in the state volume — one row per document and one per
-(document, stage), recording what has already been decided and paid for. **Back
-it up**: losing it means paying the model to decide the same things again.
-Schema changes are applied automatically when the container starts, so upgrading
-the image needs no manual step.
-
-## Install
-
-### 1. A Papra API key
-
-**Settings → API keys → Create**, with `documents:update`, `tags:read`,
-`tags:update`, and `tags:create` only if you set `allow_new_tags = true`.
-
-### 2. Add the service
+**2. Add the service** next to Papra:
 
 ```yaml
 services:
   papra-curator:
-    # Also tagged :MAJOR.MINOR.PATCH and :MAJOR.MINOR — pin one in production,
-    # since :latest moves on every push to main.
+    # Also tagged :MAJOR.MINOR.PATCH and :MAJOR.MINOR — pin one in production.
     image: ghcr.io/jtylab-sh/papra-curator:latest
-    container_name: papra-curator
     restart: unless-stopped
     depends_on: [papra]
     command: ["--serve"]
     environment:
-      # --- secrets ---
       MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       PAPRA_API_KEY: ${PAPRA_API_KEY}
-      PAPRA_WEBHOOK_SECRET: ${PAPRA_WEBHOOK_SECRET} # required by --serve
-      # --- identity ---
-      PAPRA_ORGANIZATION_ID: ${PAPRA_ORGANIZATION_ID}
+      PAPRA_WEBHOOK_SECRET: ${PAPRA_WEBHOOK_SECRET}
+      PAPRA_ORGANIZATION_ID: ${PAPRA_ORGANIZATION_ID} # from Papra's URL
       PAPRA_API_URL: http://papra:1221
       PAPRA_DB_PATH: /papra-db/db.sqlite
     volumes:
       - ./curator/config.toml:/app/config.toml:ro
       - ./papra-data/db:/papra-db:ro # Papra's app-data db directory
-      - ./curator/state:/state # this service's tracking DB
+      - ./curator/state:/state # this service's own DB
 ```
 
-`PAPRA_ORGANIZATION_ID` is in Papra's URL: `/organizations/<this>/documents`.
-
-The state directory must be writable by the container (uid 1000 by default):
+The state directory must be writable by uid 1000:
 `mkdir -p curator/state && chown 1000:1000 curator/state`.
 
-### 3. Configure
+**3. Configure.** Copy
+[`config.example.toml`](config.example.toml) to `curator/config.toml`; every
+option is documented inline. The defaults are safe: no spending, renames only
+proposed, flights off, no periodic sweep. Identity and hostnames come from the
+environment, so the file itself contains nothing personal.
+
+**4. Seed your tags first.** Create your tags in Papra **with descriptions** —
+the model reads both, and descriptions are what make the difference. With
+`allow_new_tags = false` (the default) the vocabulary is enforced in the JSON
+schema, so the model cannot invent a tag.
+
+**5. First run:**
 
 ```bash
-curl -O https://raw.githubusercontent.com/jtylab-sh/papra-curator/main/config.example.toml
-mv config.example.toml curator/config.toml
-```
-
-Every knob is documented inline. The defaults are timid: `spend = false`,
-`renaming.dry_run = true`, flights disabled, no periodic sweep. Identity and
-hostnames come from the environment, so `config.toml` holds only behaviour and
-contains nothing personal.
-
-### 4. Seed your tags first
-
-**Do this before processing anything.** With an empty or vague tag vocabulary the
-model invents per-document facts as tags. Create your tags in Papra **with
-descriptions** — the model reads the name _and_ the description, and descriptions
-are what make the difference. With `allow_new_tags = false` (the default) the
-vocabulary is enforced in the JSON schema, not merely requested in the prompt, so
-the model cannot invent one.
-
-### 5. First run
-
-```bash
-# Free: shows what the state DB knows, makes no model call.
-docker compose run --rm papra-curator --apply-renames --dry-run
-
-# Costs 5 model calls, and needs spend = true. Read the proposals before going on.
+# Set spend = true in config.toml first. Costs 5 model calls; changes nothing.
 docker compose run --rm papra-curator --once --limit 5 --dry-run
 ```
 
-When the proposals look right, drop `--dry-run`, raise `--limit`, and once you're
-confident set `renaming.dry_run = false`.
+When the proposals look right, drop `--dry-run` and raise `--limit`; once
+confident, set `renaming.dry_run = false` and apply the stored proposals with
+`--apply-renames`.
 
-### 6. Turn off Papra's native tagging
-
-Otherwise both systems tag every new document:
+**6. Turn off Papra's native tagging**, or both systems tag every new document:
 
 ```yaml
 AI_IS_ENABLED: "false"
@@ -139,84 +107,77 @@ AUTO_TAGGING_ENABLED: "false"
 
 | Command                                    | Model calls               |
 | ------------------------------------------ | ------------------------- |
-| `--apply-renames [--limit N] [--dry-run]`  | **none**                  |
+| `--serve`                                  | one per document received |
 | `--once [--limit N] [--dry-run] [--force]` | one per document          |
 | `--doc <id> [--dry-run] [--force]`         | one per document          |
-| `--serve`                                  | one per document received |
+| `--apply-renames [--limit N] [--dry-run]`  | **none**                  |
 
 - `--force` re-runs stages already recorded done.
-- `--apply-renames` writes rename proposals a previous run already computed, so
-  turning `renaming.dry_run` off does not mean paying for names twice.
+- `--apply-renames` writes rename proposals stored by earlier runs (e.g. while
+  `renaming.dry_run` was on), so names already decided are never paid for twice.
 
 ## Spending
 
+Model calls cost money, so they are off by default:
+
 ```toml
 [model]
-spend = false   # the default
+spend = false # the default
 ```
 
-While `spend` is false no model call is made at all. `--once` and `--doc` refuse
-to run and say why; `--serve` stays up and skips the documents it receives,
-recording nothing, so nothing is lost or half-processed. Set it to `true` and the
-skipped documents are picked up by the next `--once` sweep — a webhook only fires
-once, when the document is created.
+While `spend` is false, `--once` and `--doc` refuse to start and say why;
+`--serve` stays up but skips every document it receives, recording nothing.
+Nothing is lost: set `spend = true` and the next `--once` sweep picks the
+skipped documents up.
 
-`--dry-run` is not a spending control: it asks the model and then declines to
-apply the answer, costing exactly as much as a real run. `--apply-renames` is the
-only mode that never calls the model. `--limit N` caps one run at N documents.
-
-`reconcile_interval_seconds` defaults to `0` (no periodic sweep), and even when
-set the first sweep is one full interval out rather than at startup.
+- `--dry-run` is **not** free. It asks the model and then discards the answer,
+  costing exactly as much as a real run. `--limit N` is the cost bound.
+- The periodic sweep (`[trigger] reconcile_interval_seconds`) is off by default
+  and never runs at startup: on a fresh state DB it would be a full-archive
+  backfill, one model call per document.
 
 ## Webhook mode
 
-`--serve` accepts Papra's `document:created` webhook. Two requirements:
+`--serve` listens for Papra's `document:created` webhook (port `8099` by
+default).
 
-**Papra must be allowed to reach this container.** It blocks webhook URLs
-pointing at private addresses by default, and drops the delivery with no error
-visible on this side:
-
-```yaml
-WEBHOOK_URL_ALLOWED_HOSTNAMES: papra-curator
-```
-
-**A signing secret is mandatory.** The endpoint accepts POSTs from anything that
-can reach the port, so the HMAC check is the only thing between Papra and the
-network. `--serve` refuses to start without `PAPRA_WEBHOOK_SECRET`. Set the same
-value on the webhook in Papra's UI.
-
-Deliveries are not guaranteed — a restart or exhausted retries loses the event —
-so `--once` remains the way to catch up.
+- Papra refuses to deliver to private addresses unless its own container sets
+  `WEBHOOK_URL_ALLOWED_HOSTNAMES=papra-curator` — dropped deliveries produce
+  **no error on this side**.
+- `PAPRA_WEBHOOK_SECRET` is required and unsigned requests are rejected. Set
+  the same secret on the webhook in Papra's UI.
+- Deliveries are not guaranteed (a restart loses queued events), so run
+  `--once` to catch up when needed.
 
 ## The flights handler
 
-Disabled by default; it is useless without AirTrail. Enabling it requires
-`[handlers.flights] tags`, the tag or tags that mark a travel document, in your
-own vocabulary and with no default. When a document is tagged with one of them, a
-second model call extracts flight segments and files the missing ones.
+Off by default. Requires a running AirTrail plus `AIRTRAIL_URL`,
+`AIRTRAIL_KEY` and `AIRTRAIL_USER_ID` in the environment. When a document
+carries one of `[handlers.flights] tags` — your travel tags, no default — a
+second model call extracts flight segments and files the ones AirTrail does not
+already have.
 
 Two rules are enforced in code rather than trusted to the model:
 
-**The owner must be in the passenger list.** Flights booked for family are
-addressed to the account holder but flown by someone else. The model reports
-whether the owner is aboard, and the code re-verifies that exactly one passenger
-carries the owner's user id before anything is sent. Set every spelling airlines
-print, pipe-separated because those names contain commas:
+- **A flight is filed only when the owner appears in the passenger list.**
+  Being the booker or addressee is not enough — flights booked for family are
+  still addressed to the account owner. List every spelling airlines print,
+  pipe-separated (names contain commas):
 
-```bash
-AIRTRAIL_OWNER_NAMES="Jane Doe|DOE/JANE|DOE, JANE"
-```
+  ```bash
+  AIRTRAIL_OWNER_NAMES="Jane Doe|DOE/JANE|DOE, JANE"
+  ```
 
-Quote it in `.env` — `|` is a shell operator.
+- **Duplicates are keyed on (date, origin, destination), never flight number**
+  — codeshares give one flight several numbers. The same number within ±2 days
+  of an existing flight is skipped for review instead of filed, because a model
+  reading an overnight itinerary routinely slips the date by a day.
 
-**Deduplication keys on `(date, origin, destination)`, never on flight number.**
-One physical flight arrives under codeshare numbers (`IB6660` == `LA2485`) and
-carrier variants (Wizz `W4` vs `W6`). A second guard catches the other direction:
-a model reading a ticket routinely slips the date by a day on overnight
-connections, so a flight number already logged within ±2 days is flagged for
-review instead of duplicated.
+## Development
 
-Development and release notes are in [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development, tests and releases.
+
+> Written by an AI agent (Claude); reviewed and run in production by a human.
 
 ## License
 
