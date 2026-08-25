@@ -269,6 +269,24 @@ flagged for review instead of duplicated.
 
 ---
 
+## Releases
+
+Every push to `main` releases a version. CI reads the conventional-commit
+subjects since the last tag and bumps accordingly:
+
+| Commit | Bump |
+|---|---|
+| `feat(x)!: …`, or any type with a `BREAKING CHANGE:` footer | major |
+| `feat: …` | minor |
+| anything else (`fix`, `docs`, `chore`, …) | patch |
+
+It then creates the git tag and a GitHub release with generated notes, and
+publishes the image as `:MAJOR.MINOR.PATCH`, `:MAJOR.MINOR` and `:latest`. Pin a
+version in production; `:latest` moves on every push.
+
+Git tags are the source of truth for the version — `package.json` is dev
+tooling only and its `version` field is not read by anything.
+
 ## Development
 
 ```bash
