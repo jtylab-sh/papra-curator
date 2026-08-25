@@ -60,7 +60,13 @@ function parseString(text: string, lineNo: number): string {
     }
     const next = text[++i];
     const simple: Record<string, string> = {
-      n: "\n", t: "\t", r: "\r", '"': '"', "\\": "\\", b: "\b", f: "\f",
+      n: "\n",
+      t: "\t",
+      r: "\r",
+      '"': '"',
+      "\\": "\\",
+      b: "\b",
+      f: "\f",
     };
     if (next in simple) out += simple[next];
     else if (next === "u") {
@@ -146,7 +152,7 @@ export function parseToml(text: string): TomlTable {
 
   for (let i = 0; i < lines.length; i++) {
     const lineNo = i + 1;
-    let line = stripComment(lines[i]).trim();
+    const line = stripComment(lines[i]).trim();
     if (!line) continue;
 
     if (line.startsWith("[")) {
@@ -169,15 +175,17 @@ export function parseToml(text: string): TomlTable {
 
     // An array may span lines; keep consuming until the brackets balance.
     if (rhs.startsWith("[")) {
-      let depth = 0;
       let scanned = rhs;
       let cursor = i;
       for (;;) {
-        depth = 0;
+        let depth = 0;
         let inString = false;
         let escaped = false;
         for (const ch of scanned) {
-          if (escaped) { escaped = false; continue; }
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
           if (inString) {
             if (ch === "\\") escaped = true;
             else if (ch === '"') inString = false;

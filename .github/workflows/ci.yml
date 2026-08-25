@@ -17,17 +17,21 @@ jobs:
       # Runs with no dependencies installed, exactly as the image does.
       - name: Test
         run: node --test 'src/*.test.ts'
-      # tsc and @types/node are dev-only: the service has no runtime
-      # dependencies and is never built.
+      # All dev-only: the service has no runtime dependencies and is never built.
       - name: Install dev tooling
         run: npm ci
       - name: Type-check
         run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Format
+        run: npm run format:check
 
   release:
     # Every push to main releases the next version. The bump is read from the
     # conventional-commit subjects since the last tag: `type!:` or a
-    # `BREAKING CHANGE:` footer is major, `feat:` is minor, anything else patch.
+    # `BREAKING CHANGE:` footer is major, `feat:` is minor, anything else patch —
+    # except while the major is still 0, where breaking is capped at minor.
     if: github.event_name == 'push'
     needs: test
     runs-on: ubuntu-latest
@@ -72,6 +76,12 @@ jobs:
           fi
           IFS=. read -r major minor patch <<<"$base"
           patch=${patch:-0}
+          # Pre-1.0 there is no compatibility promise to break, so a breaking
+          # change bumps the minor rather than declaring 1.0.0. Releasing 1.0.0
+          # is a deliberate act: tag it by hand once the config is settled.
+          if [ "$major" -eq 0 ] && [ "$bump" = major ]; then
+            bump=minor
+          fi
           case "$bump" in
             major) major=$((major + 1)); minor=0; patch=0 ;;
             minor) minor=$((minor + 1)); patch=0 ;;

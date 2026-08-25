@@ -10,11 +10,19 @@
   },
   "scripts": {
     "test": "node --test 'src/*.test.ts'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
-  "//": "devDependencies are for type-checking ONLY. The service itself has no runtime dependencies and no build step: Node 24 runs the TypeScript directly.",
+  "//": "devDependencies are for type-checking, linting and formatting ONLY. The service itself has no runtime dependencies and no build step: Node 24 runs the TypeScript directly.",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
     "typescript": "^5.7.0",
-    "@types/node": "^24.0.0"
+    "typescript-eslint": "^8.68.0"
   }
 }

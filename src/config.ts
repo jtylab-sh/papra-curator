@@ -184,9 +184,13 @@ function applyEnvOverrides(root: TomlTable, source: Record<string, string | unde
       }
       node = node[part] as TomlTable;
     }
-    node[leaf] = leaf === "owner_names"
-      ? raw.split("|").map((name) => name.trim()).filter((name) => name.length > 0)
-      : raw.trim();
+    node[leaf] =
+      leaf === "owner_names"
+        ? raw
+            .split("|")
+            .map((name) => name.trim())
+            .filter((name) => name.length > 0)
+        : raw.trim();
   }
 }
 
@@ -268,11 +272,13 @@ export function parseConfig(
     [config.papra.dbPath, "[papra] db_path", "PAPRA_DB_PATH"],
   ];
   for (const [value, key, variable] of required) {
-    if (!value) throw new ConfigError(`${key} is required — set it in config.toml or as ${variable}`);
+    if (!value)
+      throw new ConfigError(`${key} is required — set it in config.toml or as ${variable}`);
   }
 
   if (config.tagging.maxTags < 1) throw new ConfigError("[tagging] max_tags must be at least 1");
-  if (config.model.maxAttempts < 1) throw new ConfigError("[model] max_attempts must be at least 1");
+  if (config.model.maxAttempts < 1)
+    throw new ConfigError("[model] max_attempts must be at least 1");
   if (config.flights.enabled) {
     if (!config.flights.airtrailUrl) {
       throw new ConfigError(

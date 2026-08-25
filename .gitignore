@@ -9,5 +9,5 @@ state/
 *.sqlite
 *.sqlite-journal
 
-node_modules/
+node_modules*/
 .DS_Store

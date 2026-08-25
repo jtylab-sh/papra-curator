@@ -44,7 +44,10 @@ export async function runTaggingAndRename(
     "catalogue",
     cataloguePrompt(config, tags),
     `Document name: ${doc.originalName || doc.name}\n\n${doc.content.slice(0, config.papra.contentLimit)}`,
-    catalogueSchema(tags.map((tag) => tag.name), config.tagging.allowNewTags),
+    catalogueSchema(
+      tags.map((tag) => tag.name),
+      config.tagging.allowNewTags,
+    ),
   );
 
   const applied: string[] = [];
@@ -92,10 +95,16 @@ export async function runTaggingAndRename(
     }
     // Recorded even when skipped, and the proposal is stored: `--apply-renames`
     // can then write these through later with no further model call.
-    state.setStage(doc.id, "renaming", renameDry ? "skipped" : "done", config.renaming.promptVersion, {
-      result: { from: doc.name, to: proposed, applied: !renameDry },
-      dryRun,
-    });
+    state.setStage(
+      doc.id,
+      "renaming",
+      renameDry ? "skipped" : "done",
+      config.renaming.promptVersion,
+      {
+        result: { from: doc.name, to: proposed, applied: !renameDry },
+        dryRun,
+      },
+    );
   }
 
   return { applied, proposed };
@@ -167,7 +176,10 @@ export async function processDocument(
   if (!config.flights.enabled) return;
   const wanted = new Set(config.flights.tags.map((tag) => tag.toLowerCase()));
   if (!applied.some((tag) => wanted.has(tag.toLowerCase()))) return;
-  if (!force && !state.stageNeedsRun(doc.id, "flights", config.flights.promptVersion, maxAttempts)) {
+  if (
+    !force &&
+    !state.stageNeedsRun(doc.id, "flights", config.flights.promptVersion, maxAttempts)
+  ) {
     return;
   }
 

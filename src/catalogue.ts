@@ -26,9 +26,7 @@ export interface CatalogueAnswer {
  */
 export function catalogueSchema(tagNames: string[], allowNew: boolean): object {
   const tagItems =
-    !allowNew && tagNames.length > 0
-      ? { type: "string", enum: tagNames }
-      : { type: "string" };
+    !allowNew && tagNames.length > 0 ? { type: "string", enum: tagNames } : { type: "string" };
   return {
     type: "object",
     properties: {
@@ -44,7 +42,9 @@ export function catalogueSchema(tagNames: string[], allowNew: boolean): object {
 }
 
 export function cataloguePrompt(config: Config, tags: Tag[]): string {
-  const vocabulary = tags.map((tag) => (tag.description ? `- ${tag.name}: ${tag.description}` : `- ${tag.name}`));
+  const vocabulary = tags.map((tag) =>
+    tag.description ? `- ${tag.name}: ${tag.description}` : `- ${tag.name}`,
+  );
   return [
     "You catalogue documents for a personal archive. You are given a document's " +
       "OCR text and must return both its tags and the fields used to build its " +

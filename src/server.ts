@@ -22,10 +22,15 @@ export function verifySignature(
   signature: string,
 ): boolean {
   if (!secret || !signature || !signature.includes(",")) return false;
-  const [version, encoded] = [signature.slice(0, signature.indexOf(",")), signature.slice(signature.indexOf(",") + 1)];
+  const [version, encoded] = [
+    signature.slice(0, signature.indexOf(",")),
+    signature.slice(signature.indexOf(",") + 1),
+  ];
   if (version !== "v1") return false;
 
-  const expected = createHmac("sha256", secret).update(`${webhookId}.${timestamp}.${body}`).digest();
+  const expected = createHmac("sha256", secret)
+    .update(`${webhookId}.${timestamp}.${body}`)
+    .digest();
   let given: Buffer;
   try {
     given = Buffer.from(encoded, "base64");
@@ -70,7 +75,15 @@ export function createWebhookServer(
       const raw = Buffer.concat(chunks).toString("utf8");
       const header = (name: string) => String(request.headers[name] ?? "");
 
-      if (!verifySignature(secret, header("webhook-id"), header("webhook-timestamp"), raw, header("webhook-signature"))) {
+      if (
+        !verifySignature(
+          secret,
+          header("webhook-id"),
+          header("webhook-timestamp"),
+          raw,
+          header("webhook-signature"),
+        )
+      ) {
         response.writeHead(401);
         response.end();
         ports.log("webhook: bad signature, rejected");
@@ -137,7 +150,9 @@ export async function serve(
   const intervalMs = config.trigger.reconcileIntervalSeconds * 1000;
   let lastSweep = Date.now(); // NOT 0: no sweep at startup.
   if (intervalMs > 0) {
-    ports.log(`periodic sweep every ${config.trigger.reconcileIntervalSeconds}s, first one in that long`);
+    ports.log(
+      `periodic sweep every ${config.trigger.reconcileIntervalSeconds}s, first one in that long`,
+    );
   }
 
   for (;;) {

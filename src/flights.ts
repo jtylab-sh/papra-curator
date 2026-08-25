@@ -18,19 +18,64 @@
 
 import type { Config } from "./config.ts";
 import type { Document } from "./papra.ts";
-import type { AirtrailFlight, Ports } from "./ports.ts";
+import type { Ports } from "./ports.ts";
 
 /** Flight-number prefix -> airline ICAO, which is what AirTrail's `airline` field wants. */
 const PREFIX_ICAO: Record<string, string> = {
-  FR: "RYR", RK: "RUK", FQ: "MAY", W6: "WZZ", W4: "WMT", W9: "WAZ",
-  IB: "IBE", QR: "QTR", TK: "THY", BR: "EVA", U2: "EZY", AV: "AVA",
-  LH: "DLH", VY: "VLG", RO: "ROT", A3: "AEE", KL: "KLM", AF: "AFR",
-  V7: "VOE", OS: "AUA", LX: "SWR", HV: "TRA", DY: "NAX", EW: "EWG",
-  EK: "UAE", AZ: "ITY", TP: "TAP", AY: "FIN", PC: "PGT", EI: "EIN",
-  BA: "BAW", SN: "BEL", LO: "LOT", LA: "LAN", AA: "AAL", DL: "DAL",
-  UA: "UAL", SK: "SAS", "7C": "JJA", KE: "KAL", OZ: "AAR", JL: "JAL",
-  NH: "ANA", CA: "CCA", MU: "CES", CZ: "CSN", MS: "MSR", ET: "ETH",
-  SU: "AFL", TU: "TAR", AT: "RAM", UX: "AEA", TO: "TVF", XQ: "SXS",
+  FR: "RYR",
+  RK: "RUK",
+  FQ: "MAY",
+  W6: "WZZ",
+  W4: "WMT",
+  W9: "WAZ",
+  IB: "IBE",
+  QR: "QTR",
+  TK: "THY",
+  BR: "EVA",
+  U2: "EZY",
+  AV: "AVA",
+  LH: "DLH",
+  VY: "VLG",
+  RO: "ROT",
+  A3: "AEE",
+  KL: "KLM",
+  AF: "AFR",
+  V7: "VOE",
+  OS: "AUA",
+  LX: "SWR",
+  HV: "TRA",
+  DY: "NAX",
+  EW: "EWG",
+  EK: "UAE",
+  AZ: "ITY",
+  TP: "TAP",
+  AY: "FIN",
+  PC: "PGT",
+  EI: "EIN",
+  BA: "BAW",
+  SN: "BEL",
+  LO: "LOT",
+  LA: "LAN",
+  AA: "AAL",
+  DL: "DAL",
+  UA: "UAL",
+  SK: "SAS",
+  "7C": "JJA",
+  KE: "KAL",
+  OZ: "AAR",
+  JL: "JAL",
+  NH: "ANA",
+  CA: "CCA",
+  MU: "CES",
+  CZ: "CSN",
+  MS: "MSR",
+  ET: "ETH",
+  SU: "AFL",
+  TU: "TAR",
+  AT: "RAM",
+  UX: "AEA",
+  TO: "TVF",
+  XQ: "SXS",
 };
 
 const SEAT_CLASSES = new Set(["economy", "economy+", "business", "first", "private"]);
@@ -131,8 +176,16 @@ export function icaoFor(flightNumber: string | undefined): string | undefined {
   return match ? PREFIX_ICAO[match[1]] : undefined;
 }
 
-export function keyOf(when: string | undefined, origin: string | undefined, destination: string | undefined): string {
-  return [String(when ?? "").slice(0, 10), (origin ?? "").toUpperCase(), (destination ?? "").toUpperCase()].join("|");
+export function keyOf(
+  when: string | undefined,
+  origin: string | undefined,
+  destination: string | undefined,
+): string {
+  return [
+    String(when ?? "").slice(0, 10),
+    (origin ?? "").toUpperCase(),
+    (destination ?? "").toUpperCase(),
+  ].join("|");
 }
 
 /**

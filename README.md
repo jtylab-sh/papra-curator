@@ -9,11 +9,11 @@ by a service outside Papra so they can be retried, re-run and audited.
 
 Papra has native LLM auto-tagging. Three things it structurally cannot do:
 
-| | Papra | papra-curator |
-|---|---|---|
-| Retry a failed tagging call | No — `maxRetries=0`, one attempt | Yes, to a configurable cap |
-| Re-tag after you improve a prompt or tag description | No, and no re-tag API | Yes — bump `prompt_version` |
-| Decide tags and filename together | Tags only | One model call returns both |
+|                                                      | Papra                            | papra-curator               |
+| ---------------------------------------------------- | -------------------------------- | --------------------------- |
+| Retry a failed tagging call                          | No — `maxRetries=0`, one attempt | Yes, to a configurable cap  |
+| Re-tag after you improve a prompt or tag description | No, and no re-tag API            | Yes — bump `prompt_version` |
+| Decide tags and filename together                    | Tags only                        | One model call returns both |
 
 The retry gap is the sharp one: one HTTP 429 leaves a document **permanently
 untagged**, with no API to fix it.
@@ -70,15 +70,15 @@ services:
       # --- secrets ---
       MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       PAPRA_API_KEY: ${PAPRA_API_KEY}
-      PAPRA_WEBHOOK_SECRET: ${PAPRA_WEBHOOK_SECRET}   # required by --serve
+      PAPRA_WEBHOOK_SECRET: ${PAPRA_WEBHOOK_SECRET} # required by --serve
       # --- identity ---
       PAPRA_ORGANIZATION_ID: ${PAPRA_ORGANIZATION_ID}
       PAPRA_API_URL: http://papra:1221
       PAPRA_DB_PATH: /papra-db/db.sqlite
     volumes:
       - ./curator/config.toml:/app/config.toml:ro
-      - ./papra-data/db:/papra-db:ro    # Papra's app-data db directory
-      - ./curator/state:/state          # this service's tracking DB
+      - ./papra-data/db:/papra-db:ro # Papra's app-data db directory
+      - ./curator/state:/state # this service's tracking DB
 ```
 
 `PAPRA_ORGANIZATION_ID` is in Papra's URL: `/organizations/<this>/documents`.
@@ -102,7 +102,7 @@ contains nothing personal.
 
 **Do this before processing anything.** With an empty or vague tag vocabulary the
 model invents per-document facts as tags. Create your tags in Papra **with
-descriptions** — the model reads the name *and* the description, and descriptions
+descriptions** — the model reads the name _and_ the description, and descriptions
 are what make the difference. With `allow_new_tags = false` (the default) the
 vocabulary is enforced in the JSON schema, not merely requested in the prompt, so
 the model cannot invent one.
@@ -131,12 +131,12 @@ AUTO_TAGGING_ENABLED: "false"
 
 ## Commands
 
-| Command | Model calls |
-|---|---|
-| `--apply-renames [--limit N] [--dry-run]` | **none** |
-| `--once [--limit N] [--dry-run] [--force]` | one per document |
-| `--doc <id> [--dry-run] [--force]` | one per document |
-| `--serve` | one per document received |
+| Command                                    | Model calls               |
+| ------------------------------------------ | ------------------------- |
+| `--apply-renames [--limit N] [--dry-run]`  | **none**                  |
+| `--once [--limit N] [--dry-run] [--force]` | one per document          |
+| `--doc <id> [--dry-run] [--force]`         | one per document          |
+| `--serve`                                  | one per document received |
 
 - `--force` re-runs stages already recorded done.
 - `--apply-renames` writes rename proposals a previous run already computed, so
@@ -215,11 +215,11 @@ review instead of duplicated.
 Every push to `main` releases a version. CI reads the conventional-commit
 subjects since the last tag and bumps accordingly:
 
-| Commit | Bump |
-|---|---|
+| Commit                                                      | Bump  |
+| ----------------------------------------------------------- | ----- |
 | `feat(x)!: …`, or any type with a `BREAKING CHANGE:` footer | major |
-| `feat: …` | minor |
-| anything else (`fix`, `docs`, `chore`, …) | patch |
+| `feat: …`                                                   | minor |
+| anything else (`fix`, `docs`, `chore`, …)                   | patch |
 
 It then creates the tag and a GitHub release with generated notes, and publishes
 the image as `:MAJOR.MINOR.PATCH`, `:MAJOR.MINOR` and `:latest`. Pin a version in

@@ -78,7 +78,9 @@ function requireSecrets(config: Config, needsModel: boolean): void {
     throw new Error(`${config.papra.dbPath} not found — is the bind mount path absolute?`);
   }
   if (config.flights.enabled && (!env.airtrailKey || !env.airtrailUserId)) {
-    throw new Error("[handlers.flights] is enabled but AIRTRAIL_KEY / AIRTRAIL_USER_ID are not set");
+    throw new Error(
+      "[handlers.flights] is enabled but AIRTRAIL_KEY / AIRTRAIL_USER_ID are not set",
+    );
   }
 }
 
@@ -177,7 +179,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         processDocument(config, state, ports, docId, reader.document(docId), {
           ownerUserId: env.airtrailUserId,
         }),
-      reconcile: () => reconcile(config, state, ports, reader, { dryRun: false, force: false, limit: 0 }),
+      reconcile: () =>
+        reconcile(config, state, ports, reader, { dryRun: false, force: false, limit: 0 }),
     });
     return 0;
   } finally {

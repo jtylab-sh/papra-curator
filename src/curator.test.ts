@@ -25,7 +25,13 @@ import { State } from "./state.ts";
 import { composeName, slugify, splitExtension } from "./naming.ts";
 import { catalogueSchema } from "./catalogue.ts";
 import {
-  checkFlight, icaoFor, keyOf, nearDuplicate, normFlightNumber, toAirtrail, type Segment,
+  checkFlight,
+  icaoFor,
+  keyOf,
+  nearDuplicate,
+  normFlightNumber,
+  toAirtrail,
+  type Segment,
 } from "./flights.ts";
 import { verifySignature, documentIdFrom } from "./server.ts";
 import { applyPendingRenames, processDocument } from "./pipeline.ts";
@@ -239,7 +245,11 @@ nested = "deep"
 describe("config", () => {
   it("rejects a flights handler that cannot enforce the owner rule", () => {
     assert.throws(
-      () => parseConfig(CONFIG_TOML.replace('owner_names = ["Test Owner", "OWNER/TEST"]', "owner_names = []"), {}),
+      () =>
+        parseConfig(
+          CONFIG_TOML.replace('owner_names = ["Test Owner", "OWNER/TEST"]', "owner_names = []"),
+          {},
+        ),
       /owner_names must not be empty/,
     );
   });
@@ -252,19 +262,27 @@ describe("config", () => {
   });
 
   it("defaults renaming.dry_run to true when the key is absent", () => {
-    const parsed = parseConfig(CONFIG_TOML.replace("dry_run = false\n\n[handlers.flights]", "\n[handlers.flights]"), {});
+    const parsed = parseConfig(
+      CONFIG_TOML.replace("dry_run = false\n\n[handlers.flights]", "\n[handlers.flights]"),
+      {},
+    );
     assert.equal(parsed.renaming.dryRun, true, "an unset dry_run must not mean rename everything");
   });
 
   it("defaults the flights handler off", () => {
-    const parsed = parseConfig(CONFIG_TOML.replace("enabled = true\nprompt_version = \"1\"\ntags", "prompt_version = \"1\"\ntags"), {});
+    const parsed = parseConfig(
+      CONFIG_TOML.replace(
+        'enabled = true\nprompt_version = "1"\ntags',
+        'prompt_version = "1"\ntags',
+      ),
+      {},
+    );
     assert.equal(parsed.flights.enabled, false);
   });
 
   it("takes identity from the environment so config.toml carries none", () => {
     // config.toml ships with these blank; compose supplies them.
-    const blank = CONFIG_TOML
-      .replace('organization_id = "org_test"', 'organization_id = ""')
+    const blank = CONFIG_TOML.replace('organization_id = "org_test"', 'organization_id = ""')
       .replace('airtrail_url = "https://fly.example.com"', 'airtrail_url = ""')
       .replace('owner_names = ["Test Owner", "OWNER/TEST"]', "owner_names = []");
     const parsed = parseConfig(blank, {
@@ -284,18 +302,30 @@ describe("config", () => {
   });
 
   it("ignores an unset or blank variable rather than blanking the file value", () => {
-    const parsed = parseConfig(CONFIG_TOML, { PAPRA_ORGANIZATION_ID: "   ", AIRTRAIL_URL: undefined });
+    const parsed = parseConfig(CONFIG_TOML, {
+      PAPRA_ORGANIZATION_ID: "   ",
+      AIRTRAIL_URL: undefined,
+    });
     assert.equal(parsed.papra.organizationId, "org_test");
     assert.equal(parsed.flights.airtrailUrl, "https://fly.example.com");
   });
 
   it("names both places when an identity value is missing everywhere", () => {
     const blank = CONFIG_TOML.replace('organization_id = "org_test"', 'organization_id = ""');
-    assert.throws(() => parseConfig(blank, {}), /organization_id is required.*PAPRA_ORGANIZATION_ID/s);
+    assert.throws(
+      () => parseConfig(blank, {}),
+      /organization_id is required.*PAPRA_ORGANIZATION_ID/s,
+    );
   });
 
   it("accepts a numeric prompt_version so it cannot silently fail to match", () => {
-    const parsed = parseConfig(CONFIG_TOML.replace('[tagging]\nenabled = true\nprompt_version = "1"', "[tagging]\nenabled = true\nprompt_version = 2"), {});
+    const parsed = parseConfig(
+      CONFIG_TOML.replace(
+        '[tagging]\nenabled = true\nprompt_version = "1"',
+        "[tagging]\nenabled = true\nprompt_version = 2",
+      ),
+      {},
+    );
     assert.equal(parsed.tagging.promptVersion, "2");
   });
 });
@@ -305,21 +335,36 @@ describe("filenames", () => {
 
   it("composes from fields", () => {
     assert.equal(
-      composeName(cfg, { date: "2024-10-26", party: "Air China", doctype: "carta imbarco", detail: "MXP-TFU" }, ".pdf"),
+      composeName(
+        cfg,
+        { date: "2024-10-26", party: "Air China", doctype: "carta imbarco", detail: "MXP-TFU" },
+        ".pdf",
+      ),
       "2024-10-26_air-china_carta-imbarco_mxp-tfu.pdf",
     );
   });
 
   it("leaves no dangling separator when a field is empty", () => {
     assert.equal(
-      composeName(cfg, { date: "2024-10-26", party: "Enel", doctype: "bolletta", detail: "" }, ".pdf"),
+      composeName(
+        cfg,
+        { date: "2024-10-26", party: "Enel", doctype: "bolletta", detail: "" },
+        ".pdf",
+      ),
       "2024-10-26_enel_bolletta.pdf",
     );
   });
 
   it("cannot be made to produce a path or a traversal", () => {
-    const evil = composeName(cfg, { date: "../../etc", party: "a/b\\c", doctype: "x", detail: "" }, ".pdf");
-    assert.ok(evil && !evil.includes("/") && !evil.includes("\\") && !evil.includes(".."), evil ?? "null");
+    const evil = composeName(
+      cfg,
+      { date: "../../etc", party: "a/b\\c", doctype: "x", detail: "" },
+      ".pdf",
+    );
+    assert.ok(
+      evil && !evil.includes("/") && !evil.includes("\\") && !evil.includes(".."),
+      evil ?? "null",
+    );
   });
 
   it("returns null when every field is empty rather than a bare extension", () => {
@@ -330,8 +375,15 @@ describe("filenames", () => {
     const tight = config((draft) => {
       draft.renaming.maxLength = 20;
     });
-    const short = composeName(tight, { date: "2024-10-26", party: "Air China", doctype: "carta imbarco", detail: "" }, ".pdf");
-    assert.ok(short && short.length <= 24 && !/[_-]$/.test(short.replace(".pdf", "")), short ?? "null");
+    const short = composeName(
+      tight,
+      { date: "2024-10-26", party: "Air China", doctype: "carta imbarco", detail: "" },
+      ".pdf",
+    );
+    assert.ok(
+      short && short.length <= 24 && !/[_-]$/.test(short.replace(".pdf", "")),
+      short ?? "null",
+    );
   });
 
   it("slugifies accents and punctuation", () => {
@@ -363,7 +415,8 @@ describe("webhook signature", () => {
   const timestamp = "1700000000";
   const body = '{"event":"document:created"}';
   const good =
-    "v1," + createHmac("sha256", secret).update(`${webhookId}.${timestamp}.${body}`).digest("base64");
+    "v1," +
+    createHmac("sha256", secret).update(`${webhookId}.${timestamp}.${body}`).digest("base64");
 
   it("accepts Papra's scheme", () => {
     assert.ok(verifySignature(secret, webhookId, timestamp, body, good));
@@ -430,8 +483,12 @@ describe("stage tracking", () => {
   });
 
   it("lists only pending renames that would actually change the name", () => {
-    state.setStage("d1", "renaming", "skipped", "1", { result: { from: "old.pdf", to: "new.pdf" } });
-    state.setStage("d2", "renaming", "skipped", "1", { result: { from: "same.pdf", to: "same.pdf" } });
+    state.setStage("d1", "renaming", "skipped", "1", {
+      result: { from: "old.pdf", to: "new.pdf" },
+    });
+    state.setStage("d2", "renaming", "skipped", "1", {
+      result: { from: "same.pdf", to: "same.pdf" },
+    });
     state.setStage("d3", "renaming", "skipped", "1", { result: { from: "x.pdf", to: null } });
     state.setStage("d4", "renaming", "done", "1", { result: { from: "a.pdf", to: "b.pdf" } });
     assert.deepEqual(state.pendingRenames(), [{ docId: "d1", from: "old.pdf", to: "new.pdf" }]);
@@ -474,7 +531,10 @@ describe("flight conversion", () => {
   it("drops an invalid seat class instead of sending it", () => {
     const body = toAirtrail(segment({ seatClass: "coach" }), OWNER);
     assert.equal(body.passengers[0].seatClass, undefined);
-    assert.equal(toAirtrail(segment({ seatClass: "business" }), OWNER).passengers[0].seatClass, "business");
+    assert.equal(
+      toAirtrail(segment({ seatClass: "business" }), OWNER).passengers[0].seatClass,
+      "business",
+    );
   });
 
   it("catches a one-day model date slip on the same flight number", () => {
@@ -482,9 +542,18 @@ describe("flight conversion", () => {
       { flightNumber: "TK1895", date: "2026-10-31" },
       { flightNumber: "FR4475", date: "2022-06-24" },
     ];
-    assert.equal(nearDuplicate({ flightNumber: "TK1895", departure: "2026-10-30" }, logged, 2), "2026-10-31");
-    assert.equal(nearDuplicate({ flightNumber: "TK1895", departure: "2026-12-25" }, logged, 2), null);
-    assert.equal(nearDuplicate({ flightNumber: "TK197", departure: "2026-10-31" }, logged, 2), null);
+    assert.equal(
+      nearDuplicate({ flightNumber: "TK1895", departure: "2026-10-30" }, logged, 2),
+      "2026-10-31",
+    );
+    assert.equal(
+      nearDuplicate({ flightNumber: "TK1895", departure: "2026-12-25" }, logged, 2),
+      null,
+    );
+    assert.equal(
+      nearDuplicate({ flightNumber: "TK197", departure: "2026-10-31" }, logged, 2),
+      null,
+    );
     assert.equal(nearDuplicate({ departure: "2026-10-31" }, logged, 2), null);
   });
 });
@@ -502,7 +571,11 @@ describe("pipeline", () => {
     processDocument(cfg, state, ports, doc.id, doc, { ownerUserId: OWNER, ...options });
 
   it("touches nothing at all while [model] spend is false", async () => {
-    await run(config((draft) => { draft.model.spend = false; }));
+    await run(
+      config((draft) => {
+        draft.model.spend = false;
+      }),
+    );
     assert.deepEqual(ports.modelCalls, [], "spend = false must mean no model call");
     assert.deepEqual(ports.appliedTags, []);
     assert.equal(
@@ -547,10 +620,12 @@ describe("pipeline", () => {
 
   it("creates a new tag only when allow_new_tags is on", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["nuovo"]);
-    await run(config((draft) => {
-      draft.tagging.allowNewTags = true;
-      draft.flights.enabled = false;
-    }));
+    await run(
+      config((draft) => {
+        draft.tagging.allowNewTags = true;
+        draft.flights.enabled = false;
+      }),
+    );
     assert.deepEqual(ports.createdTags, ["nuovo"]);
   });
 
@@ -575,9 +650,11 @@ describe("pipeline", () => {
   it("reprocesses when the prompt version is bumped", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"]);
     await run(config());
-    await run(config((draft) => {
-      draft.tagging.promptVersion = "2";
-    }));
+    await run(
+      config((draft) => {
+        draft.tagging.promptVersion = "2";
+      }),
+    );
     assert.deepEqual(ports.modelCalls, ["catalogue", "catalogue"]);
   });
 
@@ -585,7 +662,11 @@ describe("pipeline", () => {
     ports.answers["catalogue"] = catalogueAnswer(["viaggi"]);
     ports.failOn["flights"] = "airtrail is down";
     await run(config());
-    assert.equal(state.stageRow("doc1", "tagging")?.status, "done", "one failure must not cost the tags");
+    assert.equal(
+      state.stageRow("doc1", "tagging")?.status,
+      "done",
+      "one failure must not cost the tags",
+    );
     assert.equal(state.stageRow("doc1", "flights")?.status, "error");
   });
 
@@ -606,10 +687,12 @@ describe("pipeline", () => {
 
   it("skips the rename call when renaming.dry_run is on but stores the proposal", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"], { party: "Enel", doctype: "bolletta" });
-    await run(config((draft) => {
-      draft.renaming.dryRun = true;
-      draft.flights.enabled = false;
-    }));
+    await run(
+      config((draft) => {
+        draft.renaming.dryRun = true;
+        draft.flights.enabled = false;
+      }),
+    );
     assert.equal(ports.renames.length, 0);
     const row = state.stageRow("doc1", "renaming");
     assert.equal(row?.status, "skipped");
@@ -642,7 +725,11 @@ describe("pipeline", () => {
     await run(cfg);
     ports.failOn["rename"] = "409 conflict";
     await applyPendingRenames(cfg, state, ports);
-    assert.equal(state.stageRow("doc1", "renaming")?.status, "skipped", "a failed rename stays pending");
+    assert.equal(
+      state.stageRow("doc1", "renaming")?.status,
+      "skipped",
+      "a failed rename stays pending",
+    );
   });
 });
 
@@ -663,12 +750,18 @@ describe("spend brake", () => {
     // The guard is the first statement in askModel, so an unreachable host and
     // a bogus key never matter — nothing leaves the process.
     const ports = createPorts(config(), { mistralKey: "", papraApiKey: "", airtrailKey: "" });
-    await assert.rejects(() => ports.askModel("catalogue", "s", "u", {}), /refusing to call the model/);
+    await assert.rejects(
+      () => ports.askModel("catalogue", "s", "u", {}),
+      /refusing to call the model/,
+    );
   });
 
   it("names the free alternative in the error", async () => {
     const ports = createPorts(config(), secrets);
-    await assert.rejects(() => ports.askModel("catalogue", "s", "u", {}), /--apply-renames costs none/);
+    await assert.rejects(
+      () => ports.askModel("catalogue", "s", "u", {}),
+      /--apply-renames costs none/,
+    );
   });
 
   it("defaults [model] spend to false when the key is absent", () => {
@@ -677,9 +770,15 @@ describe("spend brake", () => {
   });
 
   it("refuses a model call whenever the config says not to spend", async () => {
-    const ports = createPorts(config((draft) => { draft.model.spend = false; }), secrets, {
-      allowSpend: false,
-    });
+    const ports = createPorts(
+      config((draft) => {
+        draft.model.spend = false;
+      }),
+      secrets,
+      {
+        allowSpend: false,
+      },
+    );
     await assert.rejects(() => ports.askModel("catalogue", "s", "u", {}), SpendBlockedError);
   });
 });

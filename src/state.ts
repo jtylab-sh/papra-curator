@@ -68,7 +68,9 @@ export class State {
       .run(
         docId,
         new Date().toISOString(),
-        createHash("sha256").update(content ?? "").digest("hex"),
+        createHash("sha256")
+          .update(content ?? "")
+          .digest("hex"),
         originalName,
       );
   }

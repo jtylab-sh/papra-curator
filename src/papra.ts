@@ -85,7 +85,9 @@ export class PapraReader {
       if (limit > 0) sql += ` limit ${Math.trunc(limit)}`;
       // node:sqlite types rows as Record<string, SQLOutputValue>; the shape is
       // guaranteed by DOCUMENT_COLUMNS above, so assert through unknown.
-      const rows = db.prepare(sql).all(this.config.papra.organizationId) as unknown as DocumentRow[];
+      const rows = db
+        .prepare(sql)
+        .all(this.config.papra.organizationId) as unknown as DocumentRow[];
       return rows.map(toDocument);
     } finally {
       db.close();
@@ -101,8 +103,11 @@ export class PapraReader {
           "select id, name, coalesce(description, '') as description from tags" +
             " where organization_id = ? order by name",
         )
-        .all(this.config.papra.organizationId) as
-        { id: string; name: string; description: string }[];
+        .all(this.config.papra.organizationId) as {
+        id: string;
+        name: string;
+        description: string;
+      }[];
       return rows;
     } finally {
       db.close();
