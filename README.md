@@ -47,16 +47,11 @@ running Papra because it uses `journal_mode=delete`, so a reader needs no lock
 files. Every **write** goes through Papra's **HTTP API**, never its database:
 writing behind its back would leave its full-text index stale.
 
-**Ours**, a SQLite file in the state volume, through **Prisma** — one row per
-document and one per (document, stage), recording what has already been decided
-and paid for. Losing it means paying the model again. The schema lives in
-[`prisma/schema.prisma`](prisma/schema.prisma) and migrations are applied at
-container start.
-
-Node 24 runs the TypeScript directly, stripping types at load, so there is no
-transpile step — but `prisma generate` is a build step, and `@prisma/client` and
-its SQLite adapter are runtime dependencies. `npm ci` is required before running
-anything from a clone.
+**Ours**, a SQLite file in the state volume — one row per document and one per
+(document, stage), recording what has already been decided and paid for. **Back
+it up**: losing it means paying the model to decide the same things again.
+Schema changes are applied automatically when the container starts, so upgrading
+the image needs no manual step.
 
 ## Install
 
@@ -70,6 +65,8 @@ anything from a clone.
 ```yaml
 services:
   papra-curator:
+    # Also tagged :MAJOR.MINOR.PATCH and :MAJOR.MINOR — pin one in production,
+    # since :latest moves on every push to main.
     image: ghcr.io/jtylab-sh/papra-curator:latest
     container_name: papra-curator
     restart: unless-stopped
@@ -219,45 +216,7 @@ a model reading a ticket routinely slips the date by a day on overnight
 connections, so a flight number already logged within ±2 days is flagged for
 review instead of duplicated.
 
-## Releases
-
-Every push to `main` releases a version. CI reads the conventional-commit
-subjects since the last tag and bumps accordingly:
-
-| Commit                                                      | Bump  |
-| ----------------------------------------------------------- | ----- |
-| `feat(x)!: …`, or any type with a `BREAKING CHANGE:` footer | major |
-| `feat: …`                                                   | minor |
-| anything else (`fix`, `docs`, `chore`, …)                   | patch |
-
-It then creates the tag and a GitHub release with generated notes, and publishes
-the image as `:MAJOR.MINOR.PATCH`, `:MAJOR.MINOR` and `:latest`. Pin a version in
-production; `:latest` moves on every push. Git tags are the source of truth —
-`package.json`'s `version` field is not read by anything.
-
-## Development
-
-```bash
-npm ci
-npm test              # generates the Prisma client first, then runs the tests
-npm run typecheck
-npm run lint          # eslint
-npm run format        # prettier
-```
-
-Changing `prisma/schema.prisma` means a migration:
-
-```bash
-DATABASE_URL="file:./dev.db" npx prisma migrate dev --name what-changed
-```
-
-61 tests, no network and no Papra — the outside world is behind one `Ports`
-interface, and each test gets its own in-memory database built from the real
-migration SQL, so the tests and production cannot drift. They cover the
-invariants whose failure costs money or data: no model call while `spend` is
-false, no second call for a non-travel document, nothing written by a dry run, no
-flight filed for a document the owner did not fly, no unsigned webhook accepted,
-no invented tag, no filename that is a path.
+Development and release notes are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
