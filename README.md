@@ -4,8 +4,6 @@ Tagging, renaming and downstream handlers for [Papra](https://papra.app), owned
 by a service outside Papra so they can be retried, re-run and audited.
 
 > Written by an AI agent (Claude), reviewed and run in production by a human.
-> The cost-control design in particular comes from a real incident, described in
-> [Why the brakes exist](#why-the-brakes-exist).
 
 ---
 
@@ -42,7 +40,7 @@ What this service adds:
 ```
 document:created webhook ──► queue ──► [ tag + rename ]  ← one model call
                                               │
-                             tags include `viaggi`?
+                         tags include a flights tag?
                                               │
                                               ▼
                                         [ flights ]      ← second model call
@@ -92,7 +90,7 @@ services:
   papra-curator:
     image: ghcr.io/jtylab-sh/papra-curator:latest
     container_name: papra-curator
-    # Never started by `docker compose up -d`. See "Why the brakes exist".
+    # Never started by `docker compose up -d`. See "Spending".
     profiles: ["manual"]
     restart: "no"
     depends_on: [papra]
@@ -189,31 +187,31 @@ AUTO_TAGGING_ENABLED: "false"
 
 ---
 
-## Why the brakes exist
+## Spending
 
-An earlier version swept every document on startup, to catch webhook deliveries
-that had been dropped. That is fine on a warm state DB. On a cold one, "nothing
-has been processed yet" means *every* document is due — so a plain
-`docker compose up -d` tagged an entire 582-document archive, about **$12.50**,
-unasked and unnoticed until the provider's billing page showed it.
+Every model call is off unless you ask for it, on that invocation:
 
-So there are now three independent brakes, and they are load-bearing:
+- **`--spend` enables it.** Without the flag no model call happens — enforced at
+  a single choke point every call passes through, so it covers sweeps, webhooks,
+  dry runs and any handler added later. It is a flag rather than a config key or
+  an environment variable on purpose: a flag has to be typed every time, whereas
+  a setting gets turned on once and then forgotten.
+- **`--limit N` bounds it** to N documents. This is the spend control on
+  `--once`.
+- **`--apply-renames` never spends** at all; it writes names an earlier run
+  already decided.
+- **`--dry-run` does not disable spending.** It asks the model and then declines
+  to apply the answer, costing exactly as much as a real run.
 
-1. **`profiles: ["manual"]`** — the service is not started by
-   `docker compose up -d`.
-2. **No default action** — running it with no arguments prints usage and exits
-   non-zero. A container that starts by accident does nothing.
-3. **No model call without `--spend`** — enforced at a single choke point that
-   every model call passes through, so it covers sweeps, webhooks, dry runs and
-   any handler added later.
+Two more defaults keep the service from spending on its own:
 
-`--spend` is a command-line flag rather than a config key or an environment
-variable **on purpose**: a flag has to be typed on every invocation, whereas a
-setting gets turned on once and then forgotten. That distinction is the whole
-lesson of the incident.
+- **`profiles: ["manual"]`** — `docker compose up -d` does not start it.
+- **No default action** — no arguments prints usage and exits non-zero, so a
+  container started by accident does nothing.
 
-Related: `reconcile_interval_seconds` defaults to `0`, and even when enabled the
-first sweep is scheduled one full interval out rather than at startup.
+To disable spending entirely, stop passing `--spend`. `reconcile_interval_seconds`
+defaults to `0` (no periodic sweep), and even when set the first sweep is one
+full interval out rather than at startup.
 
 ---
 
@@ -242,12 +240,12 @@ so `--once` remains the way to catch up.
 
 ## The flights handler
 
-Disabled by default; it is useless without AirTrail. When a document is tagged
-`viaggi` (configurable), a second model call extracts flight segments and files
-the missing ones.
+Disabled by default; it is useless without AirTrail. Enabling it requires
+`[handlers.flights] tags` — the tag or tags that mark a travel document, in your
+own vocabulary, with no default. When a document is tagged with one of them, a
+second model call extracts flight segments and files the missing ones.
 
-Two rules are enforced in code rather than trusted to the model, both learned
-the hard way:
+Two rules are enforced in code rather than trusted to the model:
 
 **The owner must be in the passenger list.** Flights booked for family are
 addressed to the account holder but flown by someone else. The model reports
@@ -278,7 +276,7 @@ node --test 'src/*.test.ts'   # no install needed
 npm ci && npm run typecheck   # dev-only tooling
 ```
 
-59 tests, no network, no Papra, no config file — the outside world is behind one
+60 tests, no network, no Papra, no config file — the outside world is behind one
 `Ports` interface and the state DB runs in memory. They are weighted toward
 invariants whose failure costs money or data rather than toward coverage:
 
