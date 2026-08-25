@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { createPorts, SpendBlockedError } from "#~/ports.ts";
-import { CONFIG_TOML, config } from "#~/test-helpers.ts";
+import { createPorts, SpendBlockedError } from "#~/ports/index.ts";
+import { CONFIG_TOML, config } from "#~/testing/helpers.ts";
 import { parseConfig } from "#~/config/index.ts";
 
 describe("spend brake", () => {

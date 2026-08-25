@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { parseConfig } from "#~/config/index.ts";
-import { CONFIG_TOML } from "#~/test-helpers.ts";
+import { CONFIG_TOML } from "#~/testing/helpers.ts";
 
 describe("config", () => {
   it("throws rather than silently skipping a line it cannot parse", async () => {

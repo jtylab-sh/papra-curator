@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, beforeEach } from "node:test";
 
-import { State, createSchema } from "#~/state.ts";
+import { State, createSchema } from "#~/state/index.ts";
 
 describe("stage tracking", () => {
   let state: State;

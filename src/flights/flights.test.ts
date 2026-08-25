@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import { icaoFor, normFlightNumber } from "#~/flights/airlines.ts";
 import { checkFlight, keyOf, nearDuplicate, toAirtrail } from "#~/flights/index.ts";
-import { OWNER, segment } from "#~/test-helpers.ts";
+import { OWNER, segment } from "#~/testing/helpers.ts";
 
 describe("flight conversion", () => {
   it("normalises flight numbers and airlines", async () => {

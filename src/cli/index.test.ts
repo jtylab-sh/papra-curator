@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { parseArgs } from "#~/main.ts";
+import { parseArgs } from "#~/cli/index.ts";
 
 describe("cli", () => {
   it("has no default action", async () => {

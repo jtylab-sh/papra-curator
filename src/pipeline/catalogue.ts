@@ -7,7 +7,7 @@
  */
 
 import type { Config } from "#~/config/index.ts";
-import type { Tag } from "#~/papra.ts";
+import type { Tag } from "#~/papra/index.ts";
 import { NAME_FIELDS } from "#~/pipeline/naming.ts";
 
 export interface CatalogueAnswer {

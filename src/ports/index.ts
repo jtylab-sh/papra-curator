@@ -10,8 +10,8 @@
 import type { Config } from "#~/config/index.ts";
 
 const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
-import { requestJson } from "#~/http.ts";
-import { PapraReader, PapraWriter, type Tag } from "#~/papra.ts";
+import { requestJson } from "#~/ports/http.ts";
+import { PapraReader, PapraWriter, type Tag } from "#~/papra/index.ts";
 
 export interface AirtrailFlight {
   date?: string;

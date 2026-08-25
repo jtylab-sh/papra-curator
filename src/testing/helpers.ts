@@ -2,8 +2,8 @@
 
 import { parseConfig, type Config } from "#~/config/index.ts";
 import type { Segment } from "#~/flights/index.ts";
-import type { Document, Tag } from "#~/papra.ts";
-import type { AirtrailFlight, Ports } from "#~/ports.ts";
+import type { Document, Tag } from "#~/papra/index.ts";
+import type { AirtrailFlight, Ports } from "#~/ports/index.ts";
 
 export const CONFIG_TOML = `
 [papra]

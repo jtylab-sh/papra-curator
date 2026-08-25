@@ -1,11 +1,11 @@
 /**
  * CLI entry point.
  *
- *   node src/main.ts --once             one reconcile pass, then exit
- *   node src/main.ts --once --limit 5   the same, bounded
- *   node src/main.ts --doc <id>         process a single document
- *   node src/main.ts --apply-renames    stored renames, zero model calls
- *   node src/main.ts --serve            webhook receiver (long-running)
+ *   node src/cli/index.ts --once             one reconcile pass, then exit
+ *   node src/cli/index.ts --once --limit 5   the same, bounded
+ *   node src/cli/index.ts --doc <id>         process a single document
+ *   node src/cli/index.ts --apply-renames    stored renames, zero model calls
+ *   node src/cli/index.ts --serve            webhook receiver (long-running)
  *
  * No arguments prints usage and exits non-zero: there is no default action.
  * No mode calls the model unless `[model] spend` is true in config.toml.
@@ -17,11 +17,11 @@
 
 import { existsSync } from "node:fs";
 import { env, loadConfig, type Config } from "#~/config/index.ts";
-import { PapraReader } from "#~/papra.ts";
-import { createPorts, type Ports } from "#~/ports.ts";
+import { PapraReader } from "#~/papra/index.ts";
+import { createPorts, type Ports } from "#~/ports/index.ts";
 import { applyPendingRenames, processDocument } from "#~/pipeline/index.ts";
-import { serve } from "#~/server.ts";
-import { State } from "#~/state.ts";
+import { serve } from "#~/server/index.ts";
+import { State } from "#~/state/index.ts";
 
 const USAGE = `papra-curator
 

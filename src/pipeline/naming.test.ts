@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import { catalogueSchema } from "#~/pipeline/catalogue.ts";
 import { composeName, slugify, splitExtension } from "#~/pipeline/naming.ts";
-import { config } from "#~/test-helpers.ts";
+import { config } from "#~/testing/helpers.ts";
 
 describe("filenames", () => {
   const cfg = config();

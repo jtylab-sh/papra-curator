@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { createHmac } from "node:crypto";
-import { verifySignature, documentIdFrom } from "#~/server.ts";
+import { verifySignature, documentIdFrom } from "#~/server/index.ts";
 
 describe("webhook signature", () => {
   const secret = "s3cr3t";

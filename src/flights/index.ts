@@ -17,8 +17,8 @@
  */
 
 import type { Config } from "#~/config/index.ts";
-import type { Document } from "#~/papra.ts";
-import type { Ports } from "#~/ports.ts";
+import type { Document } from "#~/papra/index.ts";
+import type { Ports } from "#~/ports/index.ts";
 import { icaoFor, normFlightNumber } from "#~/flights/airlines.ts";
 import { FLIGHTS_SCHEMA, flightsPrompt } from "#~/flights/prompt.ts";
 

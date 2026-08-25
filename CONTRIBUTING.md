@@ -24,7 +24,7 @@ DATABASE_URL="file:./dev.db" npx prisma migrate dev --name what-changed
 ```
 
 Tests live next to the code they cover (`src/**/*.test.ts`) with shared fixtures
-in `src/test-helpers.ts`. No network and no Papra — the outside world is behind
+in `src/testing/helpers.ts`. No network and no Papra — the outside world is behind
 one `Ports` interface, and each test gets its own in-memory database built from
 the real migration SQL, so the tests and production cannot drift. They cover the
 invariants whose failure costs money or data: no model call while `spend` is

@@ -3,4 +3,4 @@
 # safe on every start, including `docker compose run` for a one-shot command.
 set -e
 node_modules/.bin/prisma migrate deploy
-exec node /app/src/main.ts "$@"
+exec node /app/src/cli/index.ts "$@"

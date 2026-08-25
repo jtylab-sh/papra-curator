@@ -11,4 +11,4 @@ eslint.config.js
 .prettierrc
 .prettierignore
 CONTRIBUTING.md
-src/test-helpers.ts
+src/testing/

@@ -162,7 +162,7 @@ export class State {
  * deployment upgrades with `prisma migrate deploy`, which does.
  */
 export async function createSchema(state: State): Promise<void> {
-  const migrations = new URL("../prisma/migrations/", import.meta.url);
+  const migrations = new URL("../../prisma/migrations/", import.meta.url);
   for (const name of readdirSync(migrations).sort()) {
     if (!name.match(/^\d/)) continue;
     const sql = readFileSync(new URL(`${name}/migration.sql`, migrations), "utf8");
