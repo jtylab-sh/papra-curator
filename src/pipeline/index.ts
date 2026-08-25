@@ -27,6 +27,8 @@ export interface RunOptions {
 export interface CatalogueResult {
   applied: string[];
   proposed: string | null;
+  /** True when the rename was actually sent to Papra, not proposed or dry-run. */
+  renamed: boolean;
 }
 
 export async function runTaggingAndRename(
@@ -83,6 +85,7 @@ export async function runTaggingAndRename(
   }
 
   let proposed: string | null = null;
+  let renamed = false;
   if (config.renaming.enabled) {
     const fields = Object.fromEntries(
       NAME_FIELDS.map((key) => [key, (answer as any)?.[key] ?? ""]),
@@ -90,9 +93,8 @@ export async function runTaggingAndRename(
     proposed = composeName(config, fields, splitExtension(doc.originalName || doc.name));
 
     const renameDry = dryRun || config.renaming.dryRun;
-    if (proposed && proposed !== doc.name && !renameDry) {
-      await ports.renameDocument(doc.id, proposed);
-    }
+    renamed = Boolean(proposed && proposed !== doc.name && !renameDry);
+    if (renamed) await ports.renameDocument(doc.id, proposed!);
     // Recorded even when skipped, and the proposal is stored: `--apply-renames`
     // can then write these through later with no further model call.
     await state.setStage(
@@ -107,7 +109,7 @@ export async function runTaggingAndRename(
     );
   }
 
-  return { applied, proposed };
+  return { applied, proposed, renamed };
 }
 
 export async function processDocument(
@@ -159,6 +161,12 @@ export async function processDocument(
       ports.log(
         `  ${doc.name.slice(0, 44).padEnd(46)} tags=${applied.join(",") || "-"}  name=${result.proposed ?? "-"}`,
       );
+      if (!dryRun && config.notify.onTagged && applied.length > 0) {
+        await ports.notify(`Tagged ${doc.name.slice(0, 60)}`, applied.join(", "));
+      }
+      if (config.notify.onRenamed && result.renamed) {
+        await ports.notify("Renamed", `${doc.name} -> ${result.proposed}`);
+      }
     } catch (error) {
       const message = String((error as Error).message ?? error).slice(0, 400);
       for (const stage of catalogueStages) {
@@ -168,6 +176,13 @@ export async function processDocument(
         });
       }
       ports.log(`  ! ${doc.name.slice(0, 44)}: catalogue failed: ${message}`);
+      if (config.notify.onError) {
+        await ports.notify(
+          "papra-curator error",
+          `${doc.name}: tagging/renaming failed: ${message}`,
+          "high",
+        );
+      }
       return;
     }
   }
@@ -198,7 +213,7 @@ export async function processDocument(
     });
     if (added.length > 0) {
       ports.log(`    flights: ${added.join(", ")}`);
-      if (config.notify.onSuccess) {
+      if (config.notify.onFlights) {
         await ports.notify(`AirTrail: ${added.length} flight(s)`, added.join("\n"));
       }
     }
@@ -209,6 +224,9 @@ export async function processDocument(
       dryRun,
     });
     ports.log(`  ! ${doc.name.slice(0, 44)}: flights failed: ${message}`);
+    if (config.notify.onError) {
+      await ports.notify("papra-curator error", `${doc.name}: flights failed: ${message}`, "high");
+    }
   }
 }
 
@@ -239,6 +257,9 @@ export async function applyPendingRenames(
         await state.setStage(proposal.docId, "renaming", "done", config.renaming.promptVersion, {
           result: { from: proposal.from, to: proposal.to, applied: true },
         });
+        if (config.notify.onRenamed) {
+          await ports.notify("Renamed", `${proposal.from} -> ${proposal.to}`);
+        }
       }
       ports.log(`  ${dryRun ? "would rename" : "renamed"}: ${proposal.from} -> ${proposal.to}`);
       applied++;

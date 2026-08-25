@@ -50,7 +50,10 @@ dry_run = false
 [notify]
 url = "http://ntfy:80"
 topic = "papra-curator"
-on_success = true
+on_tagged = true
+on_renamed = true
+on_flights = true
+on_error = true
 `;
 
 export const OWNER = "u-owner";
@@ -79,7 +82,7 @@ export class FakePorts implements Ports {
   createdTags: string[] = [];
   renames: { docId: string; name: string }[] = [];
   savedFlights: unknown[] = [];
-  notifications: string[] = [];
+  notifications: { title: string; priority: string }[] = [];
   logs: string[] = [];
 
   tags: Tag[] = [
@@ -119,8 +122,8 @@ export class FakePorts implements Ports {
   async saveFlight(body: unknown): Promise<void> {
     this.savedFlights.push(body);
   }
-  async notify(title: string): Promise<void> {
-    this.notifications.push(title);
+  async notify(title: string, _message: string, priority = "default"): Promise<void> {
+    this.notifications.push({ title, priority });
   }
   log(message: string): void {
     this.logs.push(message);

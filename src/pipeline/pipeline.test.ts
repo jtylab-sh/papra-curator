@@ -41,6 +41,40 @@ describe("pipeline", () => {
     );
   });
 
+  it("notifies tagging and renaming when their switches are on", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    await run(
+      config((draft) => {
+        draft.flights.enabled = false;
+      }),
+    );
+    assert.deepEqual(
+      ports.notifications.map((n) => n.title),
+      ["Tagged scan_001.pdf", "Renamed"],
+    );
+  });
+
+  it("sends nothing when every notification switch is off", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["viaggi"]);
+    ports.answers["flights"] = { flights: [segment()] };
+    await run(
+      config((draft) => {
+        draft.notify.onTagged = false;
+        draft.notify.onRenamed = false;
+        draft.notify.onFlights = false;
+        draft.notify.onError = false;
+      }),
+    );
+    assert.equal(ports.savedFlights.length, 1, "the work itself must still happen");
+    assert.deepEqual(ports.notifications, []);
+  });
+
+  it("notifies a failed stage with high priority when on_error is set", async () => {
+    ports.failOn["catalogue"] = "429 rate limited";
+    await run(config());
+    assert.deepEqual(ports.notifications, [{ title: "papra-curator error", priority: "high" }]);
+  });
+
   it("costs exactly one model call for a non-travel document", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"]);
     await run(config());
@@ -98,6 +132,7 @@ describe("pipeline", () => {
       "a dry run must not mark work done",
     );
     assert.equal(await state.stageRow("doc1", "renaming"), null);
+    assert.deepEqual(ports.notifications, [], "a dry run must not notify");
   });
 
   it("is a no-op on the second run", async () => {
@@ -173,6 +208,11 @@ describe("pipeline", () => {
     assert.deepEqual(ports.modelCalls, [], "the names were already decided and paid for");
     assert.deepEqual(ports.renames, [{ docId: "doc1", name: "2024-10-26_enel_bolletta.pdf" }]);
     assert.equal((await state.stageRow("doc1", "renaming"))?.status, "done");
+    assert.deepEqual(
+      ports.notifications.map((n) => n.title),
+      ["Renamed"],
+      "an applied stored rename notifies like a live one",
+    );
     assert.deepEqual(
       await state.pendingRenames(),
       [],

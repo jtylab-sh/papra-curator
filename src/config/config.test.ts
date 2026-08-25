@@ -16,6 +16,17 @@ describe("config", () => {
     );
   });
 
+  it("defaults notifications to failures and flights only", async () => {
+    const stripped = CONFIG_TOML.split("\n")
+      .filter((line) => !line.startsWith("on_"))
+      .join("\n");
+    const parsed = parseConfig(stripped, {});
+    assert.equal(parsed.notify.onTagged, false);
+    assert.equal(parsed.notify.onRenamed, false);
+    assert.equal(parsed.notify.onFlights, true);
+    assert.equal(parsed.notify.onError, true);
+  });
+
   it("rejects a flights handler that cannot enforce the owner rule", async () => {
     assert.throws(
       () =>

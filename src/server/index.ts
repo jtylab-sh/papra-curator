@@ -182,7 +182,9 @@ export async function serve(
       } catch (error) {
         const message = String((error as Error).message).slice(0, 400);
         ports.log(`reconcile failed: ${message}`);
-        await ports.notify("papra-curator sweep failed", message, "high");
+        if (config.notify.onError) {
+          await ports.notify("papra-curator sweep failed", message, "high");
+        }
       }
     }
 

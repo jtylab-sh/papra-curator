@@ -116,8 +116,11 @@ near_duplicate_days = 2
 dry_run = false
 
 [notify]
-# ntfy (https://ntfy.sh). Leave `topic` empty to disable notifications.
+# ntfy (https://ntfy.sh). Leave `topic` empty to disable all notifications.
 url = ""             # NTFY_URL
-topic = ""           # NTFY_TOPIC — empty disables notifications
-# Notify on every applied change, or only on failures.
-on_success = true
+topic = ""           # NTFY_TOPIC
+# One switch per event:
+on_tagged = false    # a document's tags were applied
+on_renamed = false   # a document was renamed, including via --apply-renames
+on_flights = true    # flights were filed into AirTrail
+on_error = true      # a stage or sweep failed (sent with high priority)

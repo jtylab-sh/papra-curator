@@ -67,7 +67,10 @@ export interface Config {
   notify: {
     url: string;
     topic: string;
-    onSuccess: boolean;
+    onTagged: boolean;
+    onRenamed: boolean;
+    onFlights: boolean;
+    onError: boolean;
   };
 }
 
@@ -205,7 +208,12 @@ export function parseConfig(
     notify: {
       url: str(notify, "url", "notify", ""),
       topic: str(notify, "topic", "notify", ""),
-      onSuccess: bool(notify, "on_success", "notify", true),
+      // One switch per event. Failures and filed flights are worth a push by
+      // default; per-document tagging and renaming are opt-in volume.
+      onTagged: bool(notify, "on_tagged", "notify", false),
+      onRenamed: bool(notify, "on_renamed", "notify", false),
+      onFlights: bool(notify, "on_flights", "notify", true),
+      onError: bool(notify, "on_error", "notify", true),
     },
   };
 
