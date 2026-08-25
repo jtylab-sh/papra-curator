@@ -199,21 +199,17 @@ export async function processDocument(
     return;
   }
 
+  const flightsDry = dryRun || config.flights.dryRun;
   try {
-    const added = await handleFlights(
-      config,
-      ports,
-      doc,
-      options.ownerUserId ?? "",
-      dryRun || config.flights.dryRun,
-    );
+    const added = await handleFlights(config, ports, doc, options.ownerUserId ?? "", flightsDry);
     await state.setStage(doc.id, "flights", "done", config.flights.promptVersion, {
       result: { added },
       dryRun,
     });
     if (added.length > 0) {
       ports.log(`    flights: ${added.join(", ")}`);
-      if (config.notify.onFlights) {
+      // A dry run files nothing, so it has nothing to announce.
+      if (config.notify.onFlights && !flightsDry) {
         await ports.notify(`AirTrail: ${added.length} flight(s)`, added.join("\n"));
       }
     }

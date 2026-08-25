@@ -202,6 +202,7 @@ describe("pipeline", () => {
     });
     await run(cfg);
     ports.modelCalls.length = 0;
+    ports.notifications.length = 0;
 
     const applied = await applyPendingRenames(cfg, state, ports);
     assert.equal(applied, 1);
