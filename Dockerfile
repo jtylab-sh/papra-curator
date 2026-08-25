@@ -19,6 +19,10 @@ FROM node:24-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Prisma's schema engine (which applies migrations at container start) links
+# against libssl; the slim image does not ship it.
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/src/generated ./src/generated
 COPY prisma ./prisma

@@ -6,7 +6,7 @@
  * 300-character names structurally impossible rather than merely discouraged.
  */
 
-import type { Config } from "./config.ts";
+import type { Config } from "#~/config/index.ts";
 
 export interface NameFields {
   date: string;

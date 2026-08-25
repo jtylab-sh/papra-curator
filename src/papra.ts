@@ -11,8 +11,8 @@
  */
 
 import { DatabaseSync } from "node:sqlite";
-import type { Config } from "./config.ts";
-import { requestJson } from "./http.ts";
+import type { Config } from "#~/config/index.ts";
+import { requestJson } from "#~/http.ts";
 
 export interface Document {
   id: string;

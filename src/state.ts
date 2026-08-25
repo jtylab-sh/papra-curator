@@ -13,8 +13,8 @@
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient } from "./generated/prisma/client.ts";
-import type { Stage } from "./config.ts";
+import { PrismaClient } from "#~/generated/prisma/client.ts";
+import type { Stage } from "#~/config/index.ts";
 
 export type StageStatus = "done" | "error" | "skipped";
 

@@ -7,9 +7,11 @@
  * calls on a fake, instead of monkeypatching modules and hoping.
  */
 
-import { MISTRAL_URL, type Config } from "./config.ts";
-import { requestJson } from "./http.ts";
-import { PapraReader, PapraWriter, type Document, type Tag } from "./papra.ts";
+import type { Config } from "#~/config/index.ts";
+
+const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
+import { requestJson } from "#~/http.ts";
+import { PapraReader, PapraWriter, type Tag } from "#~/papra.ts";
 
 export interface AirtrailFlight {
   date?: string;
@@ -130,5 +132,3 @@ export function createPorts(
     log: timestampedLog,
   };
 }
-
-export type { Document, Tag };

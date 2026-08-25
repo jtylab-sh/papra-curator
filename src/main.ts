@@ -16,12 +16,12 @@
  */
 
 import { existsSync } from "node:fs";
-import { env, loadConfig, type Config } from "./config.ts";
-import { PapraReader } from "./papra.ts";
-import { createPorts, type Ports } from "./ports.ts";
-import { applyPendingRenames, processDocument } from "./pipeline.ts";
-import { serve } from "./server.ts";
-import { State } from "./state.ts";
+import { env, loadConfig, type Config } from "#~/config/index.ts";
+import { PapraReader } from "#~/papra.ts";
+import { createPorts, type Ports } from "#~/ports.ts";
+import { applyPendingRenames, processDocument } from "#~/pipeline/index.ts";
+import { serve } from "#~/server.ts";
+import { State } from "#~/state.ts";
 
 const USAGE = `papra-curator
 

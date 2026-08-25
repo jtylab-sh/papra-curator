@@ -6,9 +6,9 @@
  * travel) costs exactly one call, start to finish.
  */
 
-import type { Config } from "./config.ts";
-import type { Tag } from "./papra.ts";
-import { NAME_FIELDS } from "./naming.ts";
+import type { Config } from "#~/config/index.ts";
+import type { Tag } from "#~/papra.ts";
+import { NAME_FIELDS } from "#~/pipeline/naming.ts";
 
 export interface CatalogueAnswer {
   tags: string[];

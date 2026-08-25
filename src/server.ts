@@ -10,8 +10,8 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import type { Config } from "./config.ts";
-import type { Ports } from "./ports.ts";
+import type { Config } from "#~/config/index.ts";
+import type { Ports } from "#~/ports.ts";
 
 /**
  * Papra signs `v1,<base64 hmac-sha256>` over `"{webhookId}.{timestamp}.{rawBody}"`.

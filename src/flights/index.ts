@@ -16,67 +16,11 @@
  *     carrier variants (Wizz W4 vs W6).
  */
 
-import type { Config } from "./config.ts";
-import type { Document } from "./papra.ts";
-import type { Ports } from "./ports.ts";
-
-/** Flight-number prefix -> airline ICAO, which is what AirTrail's `airline` field wants. */
-const PREFIX_ICAO: Record<string, string> = {
-  FR: "RYR",
-  RK: "RUK",
-  FQ: "MAY",
-  W6: "WZZ",
-  W4: "WMT",
-  W9: "WAZ",
-  IB: "IBE",
-  QR: "QTR",
-  TK: "THY",
-  BR: "EVA",
-  U2: "EZY",
-  AV: "AVA",
-  LH: "DLH",
-  VY: "VLG",
-  RO: "ROT",
-  A3: "AEE",
-  KL: "KLM",
-  AF: "AFR",
-  V7: "VOE",
-  OS: "AUA",
-  LX: "SWR",
-  HV: "TRA",
-  DY: "NAX",
-  EW: "EWG",
-  EK: "UAE",
-  AZ: "ITY",
-  TP: "TAP",
-  AY: "FIN",
-  PC: "PGT",
-  EI: "EIN",
-  BA: "BAW",
-  SN: "BEL",
-  LO: "LOT",
-  LA: "LAN",
-  AA: "AAL",
-  DL: "DAL",
-  UA: "UAL",
-  SK: "SAS",
-  "7C": "JJA",
-  KE: "KAL",
-  OZ: "AAR",
-  JL: "JAL",
-  NH: "ANA",
-  CA: "CCA",
-  MU: "CES",
-  CZ: "CSN",
-  MS: "MSR",
-  ET: "ETH",
-  SU: "AFL",
-  TU: "TAR",
-  AT: "RAM",
-  UX: "AEA",
-  TO: "TVF",
-  XQ: "SXS",
-};
+import type { Config } from "#~/config/index.ts";
+import type { Document } from "#~/papra.ts";
+import type { Ports } from "#~/ports.ts";
+import { icaoFor, normFlightNumber } from "#~/flights/airlines.ts";
+import { FLIGHTS_SCHEMA, flightsPrompt } from "#~/flights/prompt.ts";
 
 const SEAT_CLASSES = new Set(["economy", "economy+", "business", "first", "private"]);
 
@@ -112,68 +56,6 @@ export interface FlightBody {
   flightNumber?: string;
   airline?: string;
   passengers: Passenger[];
-}
-
-export const FLIGHTS_SCHEMA = {
-  type: "object",
-  properties: {
-    flights: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          from: { type: "string" },
-          to: { type: "string" },
-          departure: { type: "string" },
-          departureTime: { type: "string" },
-          arrival: { type: "string" },
-          arrivalTime: { type: "string" },
-          flightNumber: { type: "string" },
-          seatNumber: { type: "string" },
-          seatClass: { type: "string" },
-          guests: { type: "array", items: { type: "string" } },
-          ownerIsAboard: { type: "boolean" },
-          evidence: { type: "string" },
-        },
-        required: ["from", "to", "departure", "ownerIsAboard", "evidence"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["flights"],
-  additionalProperties: false,
-} as const;
-
-export function flightsPrompt(ownerNames: string[]): string {
-  return `You extract flight segments from a document's OCR text.
-
-The archive owner is: ${ownerNames.join(" | ")}
-
-RULES
-1. Return a segment only if the owner appears in the document's PASSENGER LIST.
-   Being addressed, greeted, or named as the booker/"customer contact"/payer is
-   NOT evidence of flying — the owner books flights for family members, and those
-   documents are still addressed to the owner. If the passenger list names only
-   other people, return no segments.
-2. One object per flight segment (one takeoff and one landing). A return trip is
-   two objects; each leg of a connection is its own object. Never merge legs.
-3. Airports as 3-letter IATA codes. Dates as YYYY-MM-DD. Times local 24h HH:MM.
-4. Other passengers on the same booking go in \`guests\` as full names.
-5. Invent nothing; omit any field the document does not state. If the document is
-   not a flight document, return {"flights": []}.
-6. Ignore cancelled bookings and documents that merely quote or advertise flights.`;
-}
-
-/** Uppercase, strip separators, drop leading zeros: 'BR 0096' -> 'BR96'. */
-export function normFlightNumber(value: string | undefined): string {
-  const compact = (value ?? "").toUpperCase().replaceAll(" ", "").replaceAll("-", "");
-  const match = /^([A-Z0-9]{2})0*(\d+)$/.exec(compact);
-  return match ? `${match[1]}${match[2]}` : compact;
-}
-
-export function icaoFor(flightNumber: string | undefined): string | undefined {
-  const match = /^([A-Z0-9]{2})\d/.exec(normFlightNumber(flightNumber));
-  return match ? PREFIX_ICAO[match[1]] : undefined;
 }
 
 export function keyOf(

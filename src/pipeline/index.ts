@@ -10,13 +10,13 @@
  * that is not already recorded done, so it happens only when asked for.
  */
 
-import type { Config, Stage } from "./config.ts";
-import { catalogueSchema, cataloguePrompt, type CatalogueAnswer } from "./catalogue.ts";
-import { handleFlights } from "./flights.ts";
-import { composeName, splitExtension, NAME_FIELDS } from "./naming.ts";
-import type { Document } from "./papra.ts";
-import type { Ports } from "./ports.ts";
-import type { State } from "./state.ts";
+import type { Config, Stage } from "#~/config/index.ts";
+import { catalogueSchema, cataloguePrompt, type CatalogueAnswer } from "#~/pipeline/catalogue.ts";
+import { handleFlights } from "#~/flights/index.ts";
+import { composeName, splitExtension, NAME_FIELDS } from "#~/pipeline/naming.ts";
+import type { Document } from "#~/papra.ts";
+import type { Ports } from "#~/ports.ts";
+import type { State } from "#~/state.ts";
 
 export interface RunOptions {
   dryRun?: boolean;
