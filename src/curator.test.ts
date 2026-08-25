@@ -52,6 +52,7 @@ content_settle_seconds = 20
 
 [model]
 name = "mistral-medium-latest"
+spend = true
 temperature = 0.0
 max_attempts = 3
 retry_backoff_seconds = 20
@@ -500,6 +501,17 @@ describe("pipeline", () => {
   const run = (cfg: Config, doc = document(), options = {}) =>
     processDocument(cfg, state, ports, doc.id, doc, { ownerUserId: OWNER, ...options });
 
+  it("touches nothing at all while [model] spend is false", async () => {
+    await run(config((draft) => { draft.model.spend = false; }));
+    assert.deepEqual(ports.modelCalls, [], "spend = false must mean no model call");
+    assert.deepEqual(ports.appliedTags, []);
+    assert.equal(
+      state.stageRow("doc1", "tagging"),
+      null,
+      "no attempt may be recorded, or documents park before they are ever tried",
+    );
+  });
+
   it("costs exactly one model call for a non-travel document", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"]);
     await run(config());
@@ -659,17 +671,16 @@ describe("spend brake", () => {
     await assert.rejects(() => ports.askModel("catalogue", "s", "u", {}), /--apply-renames costs none/);
   });
 
-  it("does not treat --dry-run as permission to spend", () => {
-    // --dry-run asks the model and then declines to APPLY the answer; it costs
-    // exactly as much as a real run, so it must not imply --spend.
-    const args = parseArgs(["--once", "--dry-run"]);
-    assert.equal(args.spend, false, "--dry-run must never imply --spend");
+  it("defaults [model] spend to false when the key is absent", () => {
+    const parsed = parseConfig(CONFIG_TOML.replace("spend = true\n", ""), {});
+    assert.equal(parsed.model.spend, false, "an unset spend must not mean spend freely");
   });
 
-  it("parses --spend only when it is actually given", () => {
-    assert.equal(parseArgs(["--once", "--spend"]).spend, true);
-    assert.equal(parseArgs(["--once"]).spend, false);
-    assert.equal(parseArgs(["--apply-renames"]).spend, false);
+  it("refuses a model call whenever the config says not to spend", async () => {
+    const ports = createPorts(config((draft) => { draft.model.spend = false; }), secrets, {
+      allowSpend: false,
+    });
+    await assert.rejects(() => ports.askModel("catalogue", "s", "u", {}), SpendBlockedError);
   });
 });
 
@@ -679,7 +690,7 @@ describe("cli", () => {
     assert.ok(!args.once && !args.serve && !args.applyRenames && args.doc === null);
   });
 
-  it("parses the spend control", () => {
+  it("parses --limit, the bound on how many documents a run touches", () => {
     assert.equal(parseArgs(["--once", "--limit", "5"]).limit, 5);
     assert.throws(() => parseArgs(["--limit", "0"]), /positive integer/);
     assert.throws(() => parseArgs(["--limit", "all"]), /positive integer/);

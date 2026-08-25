@@ -48,6 +48,12 @@ reconcile_interval_seconds = 0
 content_settle_seconds = 20
 
 [model]
+# false = no model call is ever made, which is the default: a fresh install
+# cannot spend anything. Every call in the service passes through one check on
+# this, so it covers sweeps, webhooks and dry runs alike.
+# Note --dry-run does NOT avoid the cost: it asks the model and then declines to
+# apply the answer. --apply-renames is the only mode that never calls the model.
+spend = false
 name = "mistral-medium-latest"
 temperature = 0.0
 # Retries per stage before a document is parked with an error. This is the whole

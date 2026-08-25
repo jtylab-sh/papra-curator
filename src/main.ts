@@ -1,19 +1,18 @@
 /**
  * CLI entry point.
  *
- *   node src/main.ts --once --spend            one reconcile pass, then exit
- *   node src/main.ts --once --spend --limit 5  the same, bounded
- *   node src/main.ts --doc <id> --spend        process a single document
- *   node src/main.ts --apply-renames           stored renames, zero model calls
- *   node src/main.ts --serve --spend           webhook receiver (long-running)
+ *   node src/main.ts --once             one reconcile pass, then exit
+ *   node src/main.ts --once --limit 5   the same, bounded
+ *   node src/main.ts --doc <id>         process a single document
+ *   node src/main.ts --apply-renames    stored renames, zero model calls
+ *   node src/main.ts --serve            webhook receiver (long-running)
  *
  * No arguments prints usage and exits non-zero: there is no default action.
- * No mode calls the model without `--spend`, which is a command-line flag only,
- * never a config key or an environment variable.
+ * No mode calls the model unless `[model] spend` is true in config.toml.
  *
- * `--dry-run` is NOT free and does NOT imply permission: it asks the model and
- * then declines to apply the answer, costing exactly as much as a real run.
- * `--apply-renames` is the only mode that never calls the model.
+ * `--dry-run` is NOT free: it asks the model and then declines to apply the
+ * answer, costing exactly as much as a real run. `--apply-renames` is the only
+ * mode that never calls the model.
  */
 
 import { existsSync } from "node:fs";
@@ -26,18 +25,17 @@ import { State } from "./state.ts";
 
 const USAGE = `papra-curator
 
-  --once --spend [--limit N] [--dry-run] [--force]   sweep documents
-  --doc <id> --spend [--dry-run] [--force]           process one document
-  --apply-renames [--limit N] [--dry-run]            stored renames, no model calls
-  --serve --spend                                    run the webhook receiver
+  --once [--limit N] [--dry-run] [--force]   sweep documents
+  --doc <id> [--dry-run] [--force]           process one document
+  --apply-renames [--limit N] [--dry-run]    stored renames, no model calls
+  --serve                                    run the webhook receiver
   --help
 
---spend is required for any mode that calls the model, and is refused without
-it. --dry-run does NOT make a run free: it asks the model and then declines to
-apply the answer, so it costs one call per document just like a real run.
---limit bounds how many documents are processed, and is the spend control.
---apply-renames writes names already decided and stored, and never calls the
-model at all.`;
+Every mode except --apply-renames calls the model once per document, and needs
+spend = true under [model] in config.toml. --dry-run does NOT make a run free:
+it asks the model and then declines to apply the answer, so it costs one call
+per document just like a real run. --limit bounds how many documents are
+processed.`;
 
 interface Args {
   once: boolean;
@@ -47,7 +45,6 @@ interface Args {
   limit: number;
   dryRun: boolean;
   force: boolean;
-  spend: boolean;
   help: boolean;
 }
 
@@ -70,7 +67,6 @@ export function parseArgs(argv: string[]): Args {
     limit,
     dryRun: flag("--dry-run"),
     force: flag("--force"),
-    spend: flag("--spend"),
     help: flag("--help") || flag("-h"),
   };
 }
@@ -120,20 +116,24 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     return 1;
   }
 
-  // The spend check comes FIRST, before the config is even read: the refusal
-  // must be the reason you see, not an incidental error from something else
-  // being unset. Nothing above this point can reach the network.
-  const mayCallModel = !args.applyRenames;  // the only mode that cannot spend
-  if (mayCallModel && !args.spend) {
+  const config = loadConfig();
+
+  // A one-shot run that could do nothing at all says so and exits, rather than
+  // reporting success over an empty sweep. `--serve` is exempt: a daemon that
+  // exited here would restart-loop, so it stays up and skips documents until
+  // spending is turned on.
+  if ((args.once || args.doc !== null) && !config.model.spend) {
     process.stderr.write(
-      "this mode calls the model (one request per document) and --spend was not given.\n" +
-        "Re-run with --spend to allow it, or use --apply-renames, which never calls the model.\n" +
+      "refusing to run: this mode calls the model once per document and " +
+        "[model] spend is false in config.toml.\n" +
+        "Set spend = true to allow it, or use --apply-renames, which never calls the model.\n" +
         "Note: --dry-run still costs a call per document.\n",
     );
     return 1;
   }
 
-  const config = loadConfig();
+  // With spending off nothing reaches the model, so its key is not needed.
+  const mayCallModel = !args.applyRenames && config.model.spend;
   requireSecrets(config, mayCallModel);
 
   const ports = createPorts(
@@ -143,7 +143,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       papraApiKey: env.papraApiKey,
       airtrailKey: env.airtrailKey,
     },
-    { allowSpend: args.spend },
+    { allowSpend: config.model.spend },
   );
   const reader = new PapraReader(config);
   const state = new State(env.stateDb);
@@ -168,6 +168,9 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         limit: args.limit,
       });
       return 0;
+    }
+    if (!config.model.spend) {
+      ports.log("[model] spend is false: documents will be received and skipped, not processed");
     }
     await serve(config, ports, env.webhookSecret, {
       processDocument: (docId) =>

@@ -61,6 +61,7 @@ export interface Config {
   };
   model: {
     name: string;
+    spend: boolean;
     temperature: number;
     maxAttempts: number;
     retryBackoffSeconds: number;
@@ -218,6 +219,9 @@ export function parseConfig(
     },
     model: {
       name: str(model, "name", "model"),
+      // Defaults OFF: no model call happens until this is turned on, so a
+      // fresh install cannot spend anything.
+      spend: bool(model, "spend", "model", false),
       temperature: num(model, "temperature", "model", 0),
       maxAttempts: num(model, "max_attempts", "model", 3),
       retryBackoffSeconds: num(model, "retry_backoff_seconds", "model", 20),

@@ -116,6 +116,13 @@ export async function processDocument(
     ports.log(`  ${docId}: not found or deleted`);
     return;
   }
+  if (!config.model.spend) {
+    // Skipped, not failed: recording an error here would burn one of the
+    // document's `max_attempts` for every delivery received while spending is
+    // off, and park it for good before it was ever tried.
+    ports.log(`  ${doc.name.slice(0, 50)}: [model] spend is false, leaving untouched`);
+    return;
+  }
   if (!doc.content.trim()) {
     // Papra extracts text asynchronously; an empty content column means it has
     // not finished, not that the document is empty.

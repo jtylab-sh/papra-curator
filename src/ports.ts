@@ -45,9 +45,7 @@ export function timestampedLog(message: string): void {
  *
  * Every model call in the service goes through `askModel`, so refusing here
  * refuses all of them — a sweep, a webhook, a --dry-run, a handler added later.
- * It defaults to false and is turned on only by the explicit `--spend` flag on
- * the command line, never by a config file and never by an environment
- * variable.
+ * It defaults to false, and is turned on only by `[model] spend` in config.toml.
  *
  * Note that --dry-run is NOT free. It asks the model and then declines to apply
  * the answer, so it costs exactly as much as a real run.
@@ -55,7 +53,7 @@ export function timestampedLog(message: string): void {
 export class SpendBlockedError extends Error {
   constructor() {
     super(
-      "refusing to call the model: pass --spend to allow it. " +
+      "refusing to call the model: set [model] spend = true in config.toml to allow it. " +
         "Note --dry-run still costs one call per document; --apply-renames costs none.",
     );
     this.name = "SpendBlockedError";
