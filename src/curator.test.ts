@@ -19,7 +19,6 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { describe, it, beforeEach } from "node:test";
 
-import { parseToml } from "./toml.ts";
 import { parseConfig, type Config } from "./config.ts";
 import { State, createSchema } from "./state.ts";
 import { composeName, slugify, splitExtension } from "./naming.ts";
@@ -191,57 +190,18 @@ function segment(overrides: Partial<Segment> = {}): Segment {
 
 // --------------------------------------------------------------------------- //
 
-describe("toml", () => {
-  it("reads the shapes the config actually uses", async () => {
-    const parsed = parseToml(`
-# comment
-[a]
-s = "hello"
-n = 42
-f = 0.5
-flag = true
-list = ["x", "y"]
-multi = [
-  "one",   # trailing comment
-  "two",
-]
-
-[a.sub]
-nested = "deep"
-`);
-    assert.deepEqual(parsed, {
-      a: {
-        s: "hello",
-        n: 42,
-        f: 0.5,
-        flag: true,
-        list: ["x", "y"],
-        multi: ["one", "two"],
-        sub: { nested: "deep" },
-      },
-    });
-  });
-
-  it("refuses to shadow a scalar with a table of the same name", async () => {
-    assert.throws(() => parseToml("[a]\nb = true\n[a.b]\nx = 1"), /b is a value, not a table/);
-  });
-
-  it("keeps a # that is inside a string", async () => {
-    assert.deepEqual(parseToml('[a]\nk = "we#ird"'), { a: { k: "we#ird" } });
-  });
-
+describe("config", () => {
   it("throws rather than silently skipping a line it cannot parse", async () => {
     // The dangerous failure mode: a config parser that ignores what it does not
     // understand can turn dry_run = true into an unset (live) run.
-    assert.throws(() => parseToml("[a]\nk = nonsense"), /line 2/);
-    assert.throws(() => parseToml("[a]\nthis line has no equals"), /line 2/);
-    assert.throws(() => parseToml("[a]\nk = { inline = 1 }"), /inline tables/);
-    assert.throws(() => parseToml("[a]\nk = 1\nk = 2"), /duplicate key/);
-    assert.throws(() => parseToml("[a]\nk = ["), /unterminated array/);
+    assert.throws(() => parseConfig(CONFIG_TOML + "\nk = nonsense", {}));
+    assert.throws(() => parseConfig(CONFIG_TOML + "\n[notify]\n", {}), /redefine/);
+    assert.throws(
+      () => parseConfig(CONFIG_TOML.replace("max_tags = 8", "max_tags = 8\nmax_tags = 9"), {}),
+      /redefine/,
+    );
   });
-});
 
-describe("config", () => {
   it("rejects a flights handler that cannot enforce the owner rule", async () => {
     assert.throws(
       () =>

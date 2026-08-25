@@ -8,7 +8,16 @@
  */
 
 import { readFileSync } from "node:fs";
-import { parseToml, type TomlTable, type TomlValue } from "./toml.ts";
+import { parse as parseToml } from "smol-toml";
+
+/**
+ * smol-toml is strict — anything it cannot parse throws with a line number
+ * rather than being skipped. That matters here: a config parser that silently
+ * ignores a line it cannot read is how a `dry_run = true` quietly becomes a
+ * live run.
+ */
+type TomlTable = { [key: string]: unknown };
+type TomlValue = unknown;
 
 export const env = {
   configPath: process.env.CURATOR_CONFIG ?? "/app/config.toml",
@@ -199,7 +208,7 @@ export function parseConfig(
   text: string,
   source: Record<string, string | undefined> = process.env,
 ): Config {
-  const root = parseToml(text);
+  const root = parseToml(text) as TomlTable;
   applyEnvOverrides(root, source);
   const papra = table(root, "papra");
   const trigger = table(root, "trigger");
