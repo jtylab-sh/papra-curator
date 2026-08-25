@@ -2,6 +2,9 @@
 
 ## Development
 
+Source imports use the `#~/` alias for `src/` (package.json `imports`, resolved
+natively by Node, tsc and eslint alike).
+
 The state DB is Prisma over SQLite; `@prisma/client` and its adapter are runtime
 dependencies and `prisma generate` is a build step, so nothing runs from a clone
 until `npm ci`.
@@ -20,9 +23,10 @@ Changing `prisma/schema.prisma` means a migration:
 DATABASE_URL="file:./dev.db" npx prisma migrate dev --name what-changed
 ```
 
-61 tests, no network and no Papra — the outside world is behind one `Ports`
-interface, and each test gets its own in-memory database built from the real
-migration SQL, so the tests and production cannot drift. They cover the
+Tests live next to the code they cover (`src/**/*.test.ts`) with shared fixtures
+in `src/test-helpers.ts`. No network and no Papra — the outside world is behind
+one `Ports` interface, and each test gets its own in-memory database built from
+the real migration SQL, so the tests and production cannot drift. They cover the
 invariants whose failure costs money or data: no model call while `spend` is
 false, no second call for a non-travel document, nothing written by a dry run, no
 flight filed for a document the owner did not fly, no unsigned webhook accepted,

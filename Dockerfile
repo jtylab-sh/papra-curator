@@ -4,6 +4,11 @@
 # binaries for glibc and would otherwise have to be compiled here.
 FROM node:24-slim AS build
 WORKDIR /app
+# openssl must be present HERE too: Prisma picks its engine binary by the libssl
+# it detects, and the build stage must download the same variant the runtime
+# stage will look for — or the container tries to re-download engines at start,
+# as a user that cannot write to node_modules.
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci
 # prisma.config.ts reads the database URL from src/config.ts, so the source has
