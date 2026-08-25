@@ -37,7 +37,7 @@ describe("spend brake", () => {
   });
 
   it("defaults [model] spend to false when the key is absent", async () => {
-    const parsed = parseConfig(CONFIG_TOML.replace("spend = true\n", ""), {});
+    const parsed = parseConfig(CONFIG_TOML.replace("spend = true\n", ""));
     assert.equal(parsed.model.spend, false, "an unset spend must not mean spend freely");
   });
 

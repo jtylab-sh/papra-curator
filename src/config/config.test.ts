@@ -63,7 +63,7 @@ describe("config", () => {
 
   it("rejects a blank identity value", async () => {
     const blank = CONFIG_TOML.replace('organization_id = "org_test"', 'organization_id = ""');
-    assert.throws(() => parseConfig(blank, {}), /organization_id is required/);
+    assert.throws(() => parseConfig(blank), /organization_id is required/);
   });
 
   it("rejects an enabled flights handler with no owner_user_id", async () => {
