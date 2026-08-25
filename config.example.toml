@@ -13,19 +13,14 @@
 #
 # Secrets come from the environment, never this file:
 #   MISTRAL_API_KEY, PAPRA_API_KEY, PAPRA_WEBHOOK_SECRET,
-#   AIRTRAIL_KEY, AIRTRAIL_USER_ID   (the last two only if flights are enabled)
+#   AIRTRAIL_KEY   (only if flights are enabled)
 
 [papra]
 # Read-only. Content is read straight from Papra's SQLite (journal_mode=delete,
 # so a reader needs no lock files); every write goes through the HTTP API.
-# Identity and hostnames come from the environment, so this file stays free of
-# anything personal and can be committed as-is. Set these in compose:
-#   PAPRA_DB_PATH  PAPRA_API_URL  PAPRA_ORGANIZATION_ID
-#   AIRTRAIL_URL   AIRTRAIL_OWNER_NAMES   NTFY_URL  NTFY_TOPIC
-# A value written here is used only when the matching variable is unset.
-db_path = ""
-api_url = ""
-organization_id = ""
+db_path = "/papra-db/db.sqlite"
+api_url = "http://papra:1221"
+organization_id = "" # from Papra's URL: /organizations/<this>/documents
 # Characters of OCR text sent to the model. Signal sits near the top of a
 # document, and a long one can run to a million characters.
 content_limit = 30000
@@ -104,12 +99,14 @@ prompt_version = "1"
 # The tag(s) that mark a travel document, exactly as named in Papra. Required
 # when `enabled` — there is no default, since the vocabulary is yours.
 tags = []
-airtrail_url = ""    # AIRTRAIL_URL
-# AIRTRAIL_OWNER_NAMES, pipe-separated. A segment becomes a flight only when one
-# of these names appears in the document's PASSENGER list — being the booker,
-# payer or addressee is not enough, because flights booked for family are still
-# addressed to the account owner. List every spelling airlines print, e.g.
-#   AIRTRAIL_OWNER_NAMES="Jane Doe|DOE/JANE|DOE, JANE"
+airtrail_url = ""
+# The AirTrail user the flights are filed under.
+owner_user_id = ""
+# A segment becomes a flight only when one of these names appears in the
+# document's PASSENGER list — being the booker, payer or addressee is not
+# enough, because flights booked for family are still addressed to the account
+# owner. List every spelling airlines print, e.g.
+#   owner_names = ["Jane Doe", "DOE/JANE", "DOE, JANE"]
 owner_names = []
 # A segment whose flight number already exists within this many days counts as a
 # duplicate. Models slip a day on overnight connections, and the (date, route)
@@ -119,8 +116,8 @@ dry_run = false
 
 [notify]
 # ntfy (https://ntfy.sh). Leave `topic` empty to disable all notifications.
-url = ""             # NTFY_URL
-topic = ""           # NTFY_TOPIC
+url = ""
+topic = ""
 # One switch per event:
 on_tagged = false    # a document's tags were applied
 on_renamed = false   # a document was renamed, including via --apply-renames

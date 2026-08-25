@@ -71,9 +71,6 @@ services:
       MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       PAPRA_API_KEY: ${PAPRA_API_KEY}
       PAPRA_WEBHOOK_SECRET: ${PAPRA_WEBHOOK_SECRET}
-      PAPRA_ORGANIZATION_ID: ${PAPRA_ORGANIZATION_ID} # from Papra's URL
-      PAPRA_API_URL: http://papra:1221
-      PAPRA_DB_PATH: /papra-db/db.sqlite
     volumes:
       - ./curator/config.toml:/app/config.toml:ro
       - ./papra-data/db:/papra-db:ro # Papra's app-data db directory
@@ -85,9 +82,10 @@ The state directory must be writable by uid 1000:
 
 **3. Configure.** Copy
 [`config.example.toml`](config.example.toml) to `curator/config.toml`; every
-option is documented inline. The defaults are safe: no spending, renames only
-proposed, flights off, no periodic sweep. Identity and hostnames come from the
-environment, so the file itself contains nothing personal.
+option is documented inline. Fill in `[papra]`: the database path, the API URL
+and the organization id (it is in Papra's URL). The defaults are safe: no
+spending, renames only proposed, flights off, no periodic sweep. The file never
+holds secrets — those stay in the environment.
 
 **4. Seed your tags.** Create your tags in Papra **with descriptions** — the
 model reads both, and descriptions are what make the difference. With
@@ -173,29 +171,20 @@ backfill is done.
 
 ## Configuration reference
 
-All behaviour lives in `config.toml` ([template](config.example.toml)); secrets
-and deployment identity live in the environment.
+Everything lives in `config.toml` ([template](config.example.toml)) except
+secrets and runtime paths, which come from the environment — no value has two
+sources.
 
 ### Environment variables
 
-| Variable                | Required            | Purpose                                                 |
-| ----------------------- | ------------------- | ------------------------------------------------------- |
-| `MISTRAL_API_KEY`       | when `spend = true` | model API key                                           |
-| `PAPRA_API_KEY`         | always              | Papra API key (writes)                                  |
-| `PAPRA_ORGANIZATION_ID` | always¹             | Papra organization, from its URL                        |
-| `PAPRA_API_URL`         | always¹             | Papra base URL, e.g. `http://papra:1221`                |
-| `PAPRA_DB_PATH`         | always¹             | Papra's SQLite file (mounted read-only)                 |
-| `PAPRA_WEBHOOK_SECRET`  | for `--serve`       | webhook HMAC secret, same value as in Papra's UI        |
-| `AIRTRAIL_URL`          | when flights on¹    | AirTrail base URL                                       |
-| `AIRTRAIL_KEY`          | when flights on     | AirTrail API key                                        |
-| `AIRTRAIL_USER_ID`      | when flights on     | AirTrail user the flights are filed under               |
-| `AIRTRAIL_OWNER_NAMES`  | when flights on¹    | owner spellings, pipe-separated: `"Jane Doe\|DOE/JANE"` |
-| `NTFY_URL` `NTFY_TOPIC` | optional¹           | ntfy server and topic                                   |
-| `DATABASE_URL`          | optional            | state DB location (default `file:/state/curator.db`)    |
-| `CURATOR_CONFIG`        | optional            | config path (default `/app/config.toml`)                |
-
-¹ overrides the matching `config.toml` key; either place works, the variable
-wins.
+| Variable               | Required            | Purpose                                              |
+| ---------------------- | ------------------- | ---------------------------------------------------- |
+| `MISTRAL_API_KEY`      | when `spend = true` | model API key                                        |
+| `PAPRA_API_KEY`        | always              | Papra API key (writes)                               |
+| `PAPRA_WEBHOOK_SECRET` | for `--serve`       | webhook HMAC secret, same value as in Papra's UI     |
+| `AIRTRAIL_KEY`         | when flights on     | AirTrail API key                                     |
+| `DATABASE_URL`         | optional            | state DB location (default `file:/state/curator.db`) |
+| `CURATOR_CONFIG`       | optional            | config path (default `/app/config.toml`)             |
 
 ### config.toml
 
@@ -227,6 +216,7 @@ wins.
 | `[handlers.flights] prompt_version`      | — (required)         | bump to re-extract flights on the next sweep                            |
 | `[handlers.flights] tags`                | — (required when on) | your travel tag(s); the gate for the second model call                  |
 | `[handlers.flights] airtrail_url`        | — (required when on) | AirTrail base URL                                                       |
+| `[handlers.flights] owner_user_id`       | — (required when on) | AirTrail user the flights are filed under                               |
 | `[handlers.flights] owner_names`         | — (required when on) | owner spellings; a flight is filed only when one is a passenger         |
 | `[handlers.flights] near_duplicate_days` | `2`                  | same flight number within ± this many days is skipped for review        |
 | `[handlers.flights] dry_run`             | `false`              | extract and log, but do not push to AirTrail                            |
@@ -258,8 +248,9 @@ documents up.
 
 ## The flights handler
 
-Off by default. Requires a running AirTrail plus `AIRTRAIL_URL`,
-`AIRTRAIL_KEY` and `AIRTRAIL_USER_ID` in the environment. When a document
+Off by default. Requires a running AirTrail and `AIRTRAIL_KEY` in the
+environment; the URL, the user id and the owner names live under
+`[handlers.flights]`. When a document
 carries one of `[handlers.flights] tags` — your travel tags, no default — a
 second model call extracts flight segments and files the ones AirTrail does not
 already have.
@@ -268,11 +259,10 @@ Two rules are enforced in code rather than trusted to the model:
 
 - **A flight is filed only when the owner appears in the passenger list.**
   Being the booker or addressee is not enough — flights booked for family are
-  still addressed to the account owner. List every spelling airlines print,
-  pipe-separated (names contain commas):
+  still addressed to the account owner. List every spelling airlines print:
 
-  ```bash
-  AIRTRAIL_OWNER_NAMES="Jane Doe|DOE/JANE|DOE, JANE"
+  ```toml
+  owner_names = ["Jane Doe", "DOE/JANE", "DOE, JANE"]
   ```
 
 - **Duplicates are keyed on (date, origin, destination), never flight number**

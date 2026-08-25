@@ -21,7 +21,6 @@ import type { State } from "#~/state/index.ts";
 export interface RunOptions {
   dryRun?: boolean;
   force?: boolean;
-  ownerUserId?: string;
 }
 
 export interface CatalogueResult {
@@ -204,7 +203,7 @@ export async function processDocument(
 
   const flightsDry = dryRun || config.flights.dryRun;
   try {
-    const added = await handleFlights(config, ports, doc, options.ownerUserId ?? "", flightsDry);
+    const added = await handleFlights(config, ports, doc, flightsDry);
     await state.setStage(doc.id, "flights", "done", config.flights.promptVersion, {
       result: { added },
       dryRun,

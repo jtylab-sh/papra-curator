@@ -24,7 +24,7 @@ describe("pipeline", () => {
   });
 
   const run = (cfg: Config, doc = document(), options = {}) =>
-    processDocument(cfg, state, ports, doc.id, doc, { ownerUserId: OWNER, ...options });
+    processDocument(cfg, state, ports, doc.id, doc, options);
 
   it("touches nothing at all while [model] spend is false", async () => {
     await run(

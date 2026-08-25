@@ -149,9 +149,9 @@ export async function handleFlights(
   config: Config,
   ports: Ports,
   doc: Document,
-  ownerUserId: string,
   dryRun = false,
 ): Promise<string[]> {
+  const ownerUserId = config.flights.ownerUserId;
   const answer = await ports.askModel(
     "flights",
     flightsPrompt(config.flights.ownerNames),

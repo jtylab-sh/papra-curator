@@ -43,6 +43,7 @@ enabled = true
 prompt_version = "1"
 tags = ["viaggi"]
 airtrail_url = "https://fly.example.com"
+owner_user_id = "u-owner"
 owner_names = ["Test Owner", "OWNER/TEST"]
 near_duplicate_days = 2
 dry_run = false
@@ -59,7 +60,7 @@ on_error = true
 export const OWNER = "u-owner";
 
 export function config(overrides: (draft: Config) => void = () => {}): Config {
-  const parsed = parseConfig(CONFIG_TOML, {});
+  const parsed = parseConfig(CONFIG_TOML);
   overrides(parsed);
   return parsed;
 }

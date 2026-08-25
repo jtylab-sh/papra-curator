@@ -6,9 +6,8 @@
 
 import { readFileSync } from "node:fs";
 import { parse as parseToml } from "smol-toml";
-import { applyEnvOverrides, env } from "#~/config/env.ts";
+import { env } from "#~/config/env.ts";
 
-// Everything else reads the environment through here, next to the config it overrides.
 export { env } from "#~/config/env.ts";
 
 /**
@@ -60,6 +59,7 @@ export interface Config {
     promptVersion: string;
     tags: string[];
     airtrailUrl: string;
+    ownerUserId: string;
     ownerNames: string[];
     nearDuplicateDays: number;
     dryRun: boolean;
@@ -143,12 +143,8 @@ function version(node: TomlTable, where: string): string {
   throw new ConfigError(`[${where}] prompt_version must be a string`);
 }
 
-export function parseConfig(
-  text: string,
-  source: Record<string, string | undefined> = process.env,
-): Config {
+export function parseConfig(text: string): Config {
   const root = parseToml(text) as TomlTable;
-  applyEnvOverrides(root, source);
   const papra = table(root, "papra");
   const trigger = table(root, "trigger");
   const model = table(root, "model");
@@ -201,6 +197,7 @@ export function parseConfig(
       promptVersion: version(flights, "handlers.flights"),
       tags: strings(flights, "tags", "handlers.flights", []),
       airtrailUrl: str(flights, "airtrail_url", "handlers.flights", ""),
+      ownerUserId: str(flights, "owner_user_id", "handlers.flights", ""),
       ownerNames: strings(flights, "owner_names", "handlers.flights", []),
       nearDuplicateDays: num(flights, "near_duplicate_days", "handlers.flights", 2),
       dryRun: bool(flights, "dry_run", "handlers.flights", false),
@@ -217,16 +214,13 @@ export function parseConfig(
     },
   };
 
-  // These three can come from either config.toml or the environment, so the
-  // error has to name both places or it sends you looking in the wrong file.
-  const required: [string, string, string][] = [
-    [config.papra.organizationId, "[papra] organization_id", "PAPRA_ORGANIZATION_ID"],
-    [config.papra.apiUrl, "[papra] api_url", "PAPRA_API_URL"],
-    [config.papra.dbPath, "[papra] db_path", "PAPRA_DB_PATH"],
+  const required: [string, string][] = [
+    [config.papra.organizationId, "[papra] organization_id"],
+    [config.papra.apiUrl, "[papra] api_url"],
+    [config.papra.dbPath, "[papra] db_path"],
   ];
-  for (const [value, key, variable] of required) {
-    if (!value)
-      throw new ConfigError(`${key} is required — set it in config.toml or as ${variable}`);
+  for (const [value, key] of required) {
+    if (!value) throw new ConfigError(`${key} is required`);
   }
 
   if (config.tagging.maxTags < 1) throw new ConfigError("[tagging] max_tags must be at least 1");
@@ -234,8 +228,11 @@ export function parseConfig(
     throw new ConfigError("[model] max_attempts must be at least 1");
   if (config.flights.enabled) {
     if (!config.flights.airtrailUrl) {
+      throw new ConfigError("[handlers.flights] airtrail_url is required when enabled");
+    }
+    if (!config.flights.ownerUserId) {
       throw new ConfigError(
-        "[handlers.flights] airtrail_url is required when enabled — set it in config.toml or as AIRTRAIL_URL",
+        "[handlers.flights] owner_user_id is required when enabled — the AirTrail user flights are filed under",
       );
     }
     if (config.flights.tags.length === 0) {
@@ -249,8 +246,7 @@ export function parseConfig(
       // Without owner names every flight in every document would look like the
       // owner's, including the ones booked for family.
       throw new ConfigError(
-        "[handlers.flights] owner_names must not be empty when enabled — set it in config.toml " +
-          "or as AIRTRAIL_OWNER_NAMES (pipe-separated)",
+        "[handlers.flights] owner_names must not be empty when enabled — every spelling airlines print for the owner",
       );
     }
   }

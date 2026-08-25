@@ -77,10 +77,8 @@ function requireSecrets(config: Config, needsModel: boolean): void {
   if (!existsSync(config.papra.dbPath)) {
     throw new Error(`${config.papra.dbPath} not found — is the bind mount path absolute?`);
   }
-  if (config.flights.enabled && (!env.airtrailKey || !env.airtrailUserId)) {
-    throw new Error(
-      "[handlers.flights] is enabled but AIRTRAIL_KEY / AIRTRAIL_USER_ID are not set",
-    );
+  if (config.flights.enabled && !env.airtrailKey) {
+    throw new Error("[handlers.flights] is enabled but AIRTRAIL_KEY is not set");
   }
 }
 
@@ -101,7 +99,6 @@ async function reconcile(
     await processDocument(config, state, ports, doc.id, doc, {
       dryRun: options.dryRun,
       force: options.force,
-      ownerUserId: env.airtrailUserId,
     });
   }
 }
@@ -159,7 +156,6 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       await processDocument(config, state, ports, args.doc, reader.document(args.doc), {
         dryRun: args.dryRun,
         force: args.force,
-        ownerUserId: env.airtrailUserId,
       });
       return 0;
     }
@@ -176,9 +172,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     }
     await serve(config, ports, env.webhookSecret, {
       processDocument: (docId) =>
-        processDocument(config, state, ports, docId, reader.document(docId), {
-          ownerUserId: env.airtrailUserId,
-        }),
+        processDocument(config, state, ports, docId, reader.document(docId)),
       reconcile: () =>
         reconcile(config, state, ports, reader, { dryRun: false, force: false, limit: 0 }),
     });
