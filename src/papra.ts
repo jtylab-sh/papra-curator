@@ -83,7 +83,9 @@ export class PapraReader {
         `select ${DOCUMENT_COLUMNS} from documents` +
         " where is_deleted = 0 and organization_id = ? order by created_at desc";
       if (limit > 0) sql += ` limit ${Math.trunc(limit)}`;
-      const rows = db.prepare(sql).all(this.config.papra.organizationId) as DocumentRow[];
+      // node:sqlite types rows as Record<string, SQLOutputValue>; the shape is
+      // guaranteed by DOCUMENT_COLUMNS above, so assert through unknown.
+      const rows = db.prepare(sql).all(this.config.papra.organizationId) as unknown as DocumentRow[];
       return rows.map(toDocument);
     } finally {
       db.close();

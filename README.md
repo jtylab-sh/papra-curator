@@ -64,10 +64,14 @@ documents are not travel — costs exactly one call per document.
 ### No dependencies, no build
 
 Node 24 strips TypeScript types at load and ships `node:sqlite`, so this runs
-`.ts` files directly with **zero npm dependencies and no build step**. There is
-no `package.json`, no `node_modules`, no compile output. The code you audit is
+`.ts` files directly with **zero runtime dependencies and no build step**. No
+`node_modules` in the image, no compile output. The code you audit is
 byte-for-byte the code that runs — which matters for something holding an API
 key and reading your entire document archive.
+
+`package.json` exists only for dev tooling: `typescript` and `@types/node`, used
+by `npm run typecheck`. Neither is installed in the image, and neither is needed
+to run the service.
 
 ---
 
@@ -270,7 +274,8 @@ flagged for review instead of duplicated.
 ## Development
 
 ```bash
-node --test 'src/*.test.ts'
+node --test 'src/*.test.ts'   # no install needed
+npm ci && npm run typecheck   # dev-only tooling
 ```
 
 59 tests, no network, no Papra, no config file — the outside world is behind one

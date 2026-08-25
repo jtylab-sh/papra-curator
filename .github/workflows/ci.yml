@@ -15,13 +15,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      # No install step: the project has no dependencies, and node 24 runs the
-      # TypeScript directly by stripping types.
+      # Runs with no dependencies installed, exactly as the image does.
       - name: Test
         run: node --test 'src/*.test.ts'
+      # tsc and @types/node are dev-only: the service has no runtime
+      # dependencies and is never built.
+      - name: Install dev tooling
+        run: npm ci
       - name: Type-check
-        # tsc is a dev-time check only; it is never needed to run the service.
-        run: npx --yes typescript@5.7 --noEmit --strict --module preserve --moduleResolution bundler --target es2023 --lib es2023 --allowImportingTsExtensions --skipLibCheck src/*.ts
+        run: npm run typecheck
 
   image:
     # Only publish from this repo's own main/tags, never from a fork's PR.

@@ -1,0 +1,20 @@
+{
+  "name": "papra-curator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tagging, renaming and downstream handlers for Papra",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test 'src/*.test.ts'",
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "devDependencies are for type-checking ONLY. The service itself has no runtime dependencies and no build step: Node 24 runs the TypeScript directly.",
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^24.0.0"
+  }
+}
