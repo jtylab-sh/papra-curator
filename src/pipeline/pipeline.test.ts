@@ -4,7 +4,14 @@ import { describe, it, beforeEach } from "node:test";
 import { State, createSchema } from "#~/state/index.ts";
 import { applyPendingRenames, processDocument } from "#~/pipeline/index.ts";
 import type { Config } from "#~/config/index.ts";
-import { FakePorts, OWNER, catalogueAnswer, config, document, segment } from "#~/testing/helpers.ts";
+import {
+  FakePorts,
+  OWNER,
+  catalogueAnswer,
+  config,
+  document,
+  segment,
+} from "#~/testing/helpers.ts";
 
 describe("pipeline", () => {
   let state: State;
