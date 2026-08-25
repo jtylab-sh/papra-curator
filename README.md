@@ -168,6 +168,71 @@ is done.
 - `--apply-renames` writes rename proposals stored by earlier runs, so names
   already decided are never paid for twice.
 
+## Configuration reference
+
+All behaviour lives in `config.toml` ([template](config.example.toml)); secrets
+and deployment identity live in the environment.
+
+### Environment variables
+
+| Variable                | Required            | Purpose                                                 |
+| ----------------------- | ------------------- | ------------------------------------------------------- |
+| `MISTRAL_API_KEY`       | when `spend = true` | model API key                                           |
+| `PAPRA_API_KEY`         | always              | Papra API key (writes)                                  |
+| `PAPRA_ORGANIZATION_ID` | always¹             | Papra organization, from its URL                        |
+| `PAPRA_API_URL`         | always¹             | Papra base URL, e.g. `http://papra:1221`                |
+| `PAPRA_DB_PATH`         | always¹             | Papra's SQLite file (mounted read-only)                 |
+| `PAPRA_WEBHOOK_SECRET`  | for `--serve`       | webhook HMAC secret, same value as in Papra's UI        |
+| `AIRTRAIL_URL`          | when flights on¹    | AirTrail base URL                                       |
+| `AIRTRAIL_KEY`          | when flights on     | AirTrail API key                                        |
+| `AIRTRAIL_USER_ID`      | when flights on     | AirTrail user the flights are filed under               |
+| `AIRTRAIL_OWNER_NAMES`  | when flights on¹    | owner spellings, pipe-separated: `"Jane Doe\|DOE/JANE"` |
+| `NTFY_URL` `NTFY_TOPIC` | optional¹           | ntfy server and topic                                   |
+| `DATABASE_URL`          | optional            | state DB location (default `file:/state/curator.db`)    |
+| `CURATOR_CONFIG`        | optional            | config path (default `/app/config.toml`)                |
+
+¹ overrides the matching `config.toml` key; either place works, the variable
+wins.
+
+### config.toml
+
+| Key                                      | Default              | Meaning                                                                 |
+| ---------------------------------------- | -------------------- | ----------------------------------------------------------------------- |
+| `[papra] db_path`                        | — (required)         | Papra's SQLite file, read-only                                          |
+| `[papra] api_url`                        | — (required)         | Papra base URL                                                          |
+| `[papra] organization_id`                | — (required)         | Papra organization id                                                   |
+| `[papra] content_limit`                  | `30000`              | characters of OCR text sent to the model                                |
+| `[trigger] listen_host`                  | `"0.0.0.0"`          | webhook bind address (`--serve`)                                        |
+| `[trigger] listen_port`                  | `8099`               | webhook port                                                            |
+| `[trigger] reconcile_interval_seconds`   | `0`                  | periodic sweep; `0` = off, first sweep one interval after start         |
+| `[trigger] content_settle_seconds`       | `20`                 | wait after `document:created` for Papra's OCR to finish                 |
+| `[model] spend`                          | `false`              | master switch: no model call while false                                |
+| `[model] name`                           | — (required)         | Mistral model, e.g. `mistral-medium-latest`                             |
+| `[model] temperature`                    | `0.0`                | sampling temperature                                                    |
+| `[model] max_attempts`                   | `3`                  | retries per stage before a document is parked with an error             |
+| `[tagging] enabled`                      | `true`               | tag documents                                                           |
+| `[tagging] prompt_version`               | — (required)         | bump to re-tag everything on the next sweep                             |
+| `[tagging] max_tags`                     | `8`                  | most tags applied per document                                          |
+| `[tagging] allow_new_tags`               | `false`              | let the model create tags (else vocabulary enforced in the schema)      |
+| `[renaming] enabled`                     | `true`               | rename documents                                                        |
+| `[renaming] prompt_version`              | — (required)         | bump to re-decide every name on the next sweep                          |
+| `[renaming] template`                    | — (required)         | e.g. `"{date}_{party}_{doctype}_{detail}"`; empty fields collapse       |
+| `[renaming] slugify_fields`              | `true`               | lowercase, ASCII-fold, non-alphanumerics to hyphens                     |
+| `[renaming] max_length`                  | `120`                | name length cap, extension excluded                                     |
+| `[renaming] dry_run`                     | `true`               | store proposals instead of renaming; apply later with `--apply-renames` |
+| `[handlers.flights] enabled`             | `false`              | file flights into AirTrail                                              |
+| `[handlers.flights] prompt_version`      | — (required)         | bump to re-extract flights on the next sweep                            |
+| `[handlers.flights] tags`                | — (required when on) | your travel tag(s); the gate for the second model call                  |
+| `[handlers.flights] airtrail_url`        | — (required when on) | AirTrail base URL                                                       |
+| `[handlers.flights] owner_names`         | — (required when on) | owner spellings; a flight is filed only when one is a passenger         |
+| `[handlers.flights] near_duplicate_days` | `2`                  | same flight number within ± this many days is skipped for review        |
+| `[handlers.flights] dry_run`             | `false`              | extract and log, but do not push to AirTrail                            |
+| `[notify] url` / `[notify] topic`        | `""`                 | ntfy server/topic; empty topic disables all notifications               |
+| `[notify] on_tagged`                     | `false`              | push when a document's tags were applied                                |
+| `[notify] on_renamed`                    | `false`              | push when a document was renamed (incl. `--apply-renames`)              |
+| `[notify] on_flights`                    | `true`               | push when flights were filed                                            |
+| `[notify] on_error`                      | `true`               | push when a stage or sweep fails (high priority)                        |
+
 ## Spending
 
 Model calls cost money, so they are off by default:
