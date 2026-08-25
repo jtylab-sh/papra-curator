@@ -18,18 +18,23 @@ document permanently untagged. papra-curator owns that pipeline instead:
   call that extracts flight segments into
   [AirTrail](https://github.com/johanohly/AirTrail).
 
+It works on **existing documents** (batch backfill over the whole archive) and
+on **new ones** (webhook, as they arrive) — same pipeline, see
+[Usage](#usage).
+
 ## How it works
 
 ```
-document:created webhook ──► queue ──► [ tag + rename ]   one model call
-                                              │
-                                   travel tag applied?
-                                              │
-                                              ▼
-                                        [ flights ]       second model call
-                                              │
-                                              ▼
-                                          AirTrail
+document:created webhook ─┐
+                          ├──► queue ──► [ tag + rename ]   one model call
+--once sweep (backfill) ──┘                     │
+                                     travel tag applied?
+                                                │
+                                                ▼
+                                          [ flights ]       second model call
+                                                │
+                                                ▼
+                                            AirTrail
 ```
 
 - One model call per document (Mistral, structured output). The second call
@@ -37,10 +42,14 @@ document:created webhook ──► queue ──► [ tag + rename ]   one model 
 - Papra's SQLite is read **read-only**; every write goes through Papra's HTTP
   API, so Papra's schema and full-text index stay its own business.
 - Its own state DB (a SQLite file) records every decision per document and
-  stage, which makes runs idempotent and re-runs explicit. **Back that file
-  up** — losing it means paying the model to make the same decisions again.
+  stage. That makes every run **idempotent**: a document already processed at
+  the current prompt version costs nothing, so sweeps are safe to repeat and
+  backfills can run in batches. **Back that file up** — losing it means paying
+  the model to make the same decisions again.
 - **No model call happens unless you set `spend = true`** — see
   [Spending](#spending).
+- Notifications via [ntfy](https://ntfy.sh) are optional, with one switch per
+  event (tagged, renamed, flights filed, errors) in `config.toml`.
 
 ## Setup
 
@@ -80,28 +89,71 @@ option is documented inline. The defaults are safe: no spending, renames only
 proposed, flights off, no periodic sweep. Identity and hostnames come from the
 environment, so the file itself contains nothing personal.
 
-**4. Seed your tags first.** Create your tags in Papra **with descriptions** —
-the model reads both, and descriptions are what make the difference. With
+**4. Seed your tags.** Create your tags in Papra **with descriptions** — the
+model reads both, and descriptions are what make the difference. With
 `allow_new_tags = false` (the default) the vocabulary is enforced in the JSON
 schema, so the model cannot invent a tag.
 
-**5. First run:**
-
-```bash
-# Set spend = true in config.toml first. Costs 5 model calls; changes nothing.
-docker compose run --rm papra-curator --once --limit 5 --dry-run
-```
-
-When the proposals look right, drop `--dry-run` and raise `--limit`; once
-confident, set `renaming.dry_run = false` and apply the stored proposals with
-`--apply-renames`.
-
-**6. Turn off Papra's native tagging**, or both systems tag every new document:
+**5. Turn off Papra's native tagging**, or both systems tag every new document:
 
 ```yaml
 AI_IS_ENABLED: "false"
 AUTO_TAGGING_ENABLED: "false"
 ```
+
+## Usage
+
+### Existing documents (backfill)
+
+Sweeps are idempotent — already-processed documents cost nothing — so backfill
+in batches and repeat the same command freely.
+
+```bash
+# 1. Set spend = true in config.toml (see Spending).
+
+# 2. Preview a small batch: 5 model calls, changes nothing in Papra.
+docker compose run --rm papra-curator --once --limit 5 --dry-run
+
+# 3. Proposals look right? Run for real, in batches.
+#    Tags apply immediately. Renames are only STORED while
+#    renaming.dry_run = true (the default).
+docker compose run --rm papra-curator --once --limit 50
+docker compose run --rm papra-curator --once            # the rest
+
+# 4. Review the stored rename proposals in the run output, then set
+#    renaming.dry_run = false and write them — zero model calls:
+docker compose run --rm papra-curator --apply-renames
+```
+
+From then on renames apply directly on every run. One document at a time:
+`--doc <id>` (the id is in the document's Papra URL).
+
+**After improving a prompt or a tag description**: bump that stage's
+`prompt_version` in `config.toml` and sweep again — exactly that stage re-runs,
+for every document. One model call per document, so treat it as a spend
+decision.
+
+### New documents (webhook)
+
+The `--serve` container from the compose file above listens on port `8099`. In
+Papra (Settings → Webhooks) create a webhook for the `document:created` event:
+
+- URL: `http://papra-curator:8099`
+- Secret: the same value as `PAPRA_WEBHOOK_SECRET` — unsigned requests are
+  rejected.
+
+And on the **Papra** container:
+
+```yaml
+# Papra refuses webhook URLs that resolve to private addresses by default, and
+# drops those deliveries with no error visible on the curator side.
+WEBHOOK_URL_ALLOWED_HOSTNAMES: papra-curator
+```
+
+Deliveries are not guaranteed — a Papra restart loses queued events — so run
+`--once` now and then to catch up, or set
+`[trigger] reconcile_interval_seconds` for a periodic sweep once the backfill
+is done.
 
 ## Commands
 
@@ -113,8 +165,8 @@ AUTO_TAGGING_ENABLED: "false"
 | `--apply-renames [--limit N] [--dry-run]`  | **none**                  |
 
 - `--force` re-runs stages already recorded done.
-- `--apply-renames` writes rename proposals stored by earlier runs (e.g. while
-  `renaming.dry_run` was on), so names already decided are never paid for twice.
+- `--apply-renames` writes rename proposals stored by earlier runs, so names
+  already decided are never paid for twice.
 
 ## Spending
 
@@ -127,27 +179,14 @@ spend = false # the default
 
 While `spend` is false, `--once` and `--doc` refuse to start and say why;
 `--serve` stays up but skips every document it receives, recording nothing.
-Nothing is lost: set `spend = true` and the next `--once` sweep picks the
-skipped documents up.
+Nothing is lost: set `spend = true` and the next sweep picks the skipped
+documents up.
 
 - `--dry-run` is **not** free. It asks the model and then discards the answer,
   costing exactly as much as a real run. `--limit N` is the cost bound.
 - The periodic sweep (`[trigger] reconcile_interval_seconds`) is off by default
   and never runs at startup: on a fresh state DB it would be a full-archive
   backfill, one model call per document.
-
-## Webhook mode
-
-`--serve` listens for Papra's `document:created` webhook (port `8099` by
-default).
-
-- Papra refuses to deliver to private addresses unless its own container sets
-  `WEBHOOK_URL_ALLOWED_HOSTNAMES=papra-curator` — dropped deliveries produce
-  **no error on this side**.
-- `PAPRA_WEBHOOK_SECRET` is required and unsigned requests are rejected. Set
-  the same secret on the webhook in Papra's UI.
-- Deliveries are not guaranteed (a restart loses queued events), so run
-  `--once` to catch up when needed.
 
 ## The flights handler
 
