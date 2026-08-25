@@ -243,6 +243,13 @@ describe("config", () => {
     );
   });
 
+  it("rejects an enabled flights handler with no trigger tags", () => {
+    assert.throws(
+      () => parseConfig(CONFIG_TOML.replace('tags = ["viaggi"]', "tags = []"), {}),
+      /tags must not be empty/,
+    );
+  });
+
   it("defaults renaming.dry_run to true when the key is absent", () => {
     const parsed = parseConfig(CONFIG_TOML.replace("dry_run = false\n\n[handlers.flights]", "\n[handlers.flights]"), {});
     assert.equal(parsed.renaming.dryRun, true, "an unset dry_run must not mean rename everything");

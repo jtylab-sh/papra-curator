@@ -94,7 +94,9 @@ dry_run = true
 # and is useless without it.
 enabled = false
 prompt_version = "1"
-tags = ["viaggi"]
+# The tag(s) that mark a travel document, exactly as named in Papra. Required
+# when `enabled` — there is no default, since the vocabulary is yours.
+tags = []
 airtrail_url = ""    # AIRTRAIL_URL
 # AIRTRAIL_OWNER_NAMES, pipe-separated. A segment becomes a flight only when one
 # of these names appears in the document's PASSENGER list — being the booker,

@@ -4,7 +4,7 @@
  *
  *     document  ->  [tag + rename]  one model call
  *                        |
- *          tags include `viaggi`?  ->  [flights]  second call  ->  AirTrail
+ *      tags include a flights tag?  ->  [flights]  second call  ->  AirTrail
  *
  * `reconcile` deliberately does NOT run on its own. An earlier version swept on
  * every container start, and because a cold state DB means "nothing is done

@@ -243,7 +243,7 @@ export function parseConfig(
       // useless to anyone who does not run AirTrail.
       enabled: bool(flights, "enabled", "handlers.flights", false),
       promptVersion: version(flights, "handlers.flights"),
-      tags: strings(flights, "tags", "handlers.flights", ["viaggi"]),
+      tags: strings(flights, "tags", "handlers.flights", []),
       airtrailUrl: str(flights, "airtrail_url", "handlers.flights", ""),
       ownerNames: strings(flights, "owner_names", "handlers.flights", []),
       nearDuplicateDays: num(flights, "near_duplicate_days", "handlers.flights", 2),
@@ -273,6 +273,13 @@ export function parseConfig(
     if (!config.flights.airtrailUrl) {
       throw new ConfigError(
         "[handlers.flights] airtrail_url is required when enabled — set it in config.toml or as AIRTRAIL_URL",
+      );
+    }
+    if (config.flights.tags.length === 0) {
+      // The tag gate is what keeps the second model call off the ~95% of an
+      // archive that is not travel. With no tags it would never fire at all.
+      throw new ConfigError(
+        "[handlers.flights] tags must not be empty when enabled — list the tag(s) that mark a travel document",
       );
     }
     if (config.flights.ownerNames.length === 0) {

@@ -1,12 +1,11 @@
 /**
  * Flights handler — files flight segments from a Papra document into AirTrail.
  *
- * Runs only when the tags just applied include one of `[handlers.flights] tags`
- * (default `viaggi`), so this second model call never happens for the ~95% of an
- * archive that is not travel. That gate is the cost control.
+ * Runs only when the tags just applied include one of `[handlers.flights] tags`,
+ * so this second model call never happens for the ~95% of an archive that is not
+ * travel. That gate is the cost control.
  *
- * Two rules were learned the hard way and are enforced here in code rather than
- * trusted to the model:
+ * Two rules are enforced here in code rather than trusted to the model:
  *
  *   - The owner must appear in the document's PASSENGER list. Flights booked for
  *     family are addressed to the owner but flown by someone else, so the model
