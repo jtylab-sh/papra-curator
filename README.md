@@ -150,10 +150,13 @@ And on the **Papra** container:
 WEBHOOK_URL_ALLOWED_HOSTNAMES: papra-curator
 ```
 
-Deliveries are not guaranteed — a Papra restart loses queued events — so run
-`--once` now and then to catch up, or set
-`[trigger] reconcile_interval_seconds` for a periodic sweep once the backfill
-is done.
+Papra extracts text asynchronously, so the service waits
+`content_settle_seconds` before reading a new document, and retries with
+increasing delays (about 20 minutes in total at the default) if the text is
+still not there. A document that never gets text in that window, and any
+delivery lost to a Papra restart, is picked up by the next sweep — so run
+`--once` now and then, or set `[trigger] reconcile_interval_seconds` once the
+backfill is done.
 
 ## Commands
 
