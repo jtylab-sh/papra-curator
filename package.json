@@ -31,6 +31,7 @@
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.0",
     "@prisma/client": "^7.10.0",
-    "prisma": "^7.10.0"
+    "prisma": "^7.10.0",
+    "smol-toml": "^1.8.0"
   }
 }

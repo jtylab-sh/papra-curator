@@ -68,8 +68,11 @@ export class PapraReader {
     const db = this.open();
     try {
       const row = db
-        .prepare(`select ${DOCUMENT_COLUMNS} from documents where id = ? and is_deleted = 0`)
-        .get(docId) as DocumentRow | undefined;
+        .prepare(
+          `select ${DOCUMENT_COLUMNS} from documents` +
+            " where id = ? and organization_id = ? and is_deleted = 0",
+        )
+        .get(docId, this.config.papra.organizationId) as DocumentRow | undefined;
       return row ? toDocument(row) : null;
     } finally {
       db.close();

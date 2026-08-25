@@ -61,7 +61,6 @@ name = "mistral-medium-latest"
 spend = true
 temperature = 0.0
 max_attempts = 3
-retry_backoff_seconds = 20
 
 [tagging]
 enabled = true
@@ -435,6 +434,12 @@ describe("webhook signature", () => {
     assert.ok(!verifySignature(secret, webhookId, timestamp, body, ""));
     // No secret must never mean "accept anything".
     assert.ok(!verifySignature("", webhookId, timestamp, body, good));
+  });
+
+  it("accepts a space-separated signature list if any entry matches", async () => {
+    // standard-webhooks sends several signatures during a secret rotation.
+    assert.ok(verifySignature(secret, webhookId, timestamp, body, `v1,AAAA ${good}`));
+    assert.ok(!verifySignature(secret, webhookId, timestamp, body, "v1,AAAA v2,BBBB"));
   });
 
   it("finds the document id in both payload shapes", async () => {

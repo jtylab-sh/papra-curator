@@ -66,7 +66,6 @@ export interface Config {
     spend: boolean;
     temperature: number;
     maxAttempts: number;
-    retryBackoffSeconds: number;
   };
   tagging: {
     enabled: boolean;
@@ -230,7 +229,6 @@ export function parseConfig(
       spend: bool(model, "spend", "model", false),
       temperature: num(model, "temperature", "model", 0),
       maxAttempts: num(model, "max_attempts", "model", 3),
-      retryBackoffSeconds: num(model, "retry_backoff_seconds", "model", 20),
     },
     tagging: {
       enabled: bool(tagging, "enabled", "tagging", true),
@@ -308,8 +306,4 @@ export function parseConfig(
 
 export function loadConfig(path: string = env.configPath): Config {
   return parseConfig(readFileSync(path, "utf8"));
-}
-
-export function promptVersionFor(config: Config, stage: Stage): string {
-  return config[stage].promptVersion;
 }

@@ -59,7 +59,6 @@ temperature = 0.0
 # Retries per stage before a document is parked with an error. This is the whole
 # reason for replacing native tagging, which retries zero times.
 max_attempts = 3
-retry_backoff_seconds = 20
 
 [tagging]
 enabled = true

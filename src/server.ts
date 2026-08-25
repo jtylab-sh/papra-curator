@@ -13,7 +13,11 @@ import { createServer, type Server } from "node:http";
 import type { Config } from "./config.ts";
 import type { Ports } from "./ports.ts";
 
-/** Papra signs `v1,<base64 hmac-sha256>` over `"{webhookId}.{timestamp}.{rawBody}"`. */
+/**
+ * Papra signs `v1,<base64 hmac-sha256>` over `"{webhookId}.{timestamp}.{rawBody}"`.
+ * Per the standard-webhooks spec the header may carry several space-separated
+ * signatures (e.g. after a secret rotation); any valid v1 entry accepts.
+ */
 export function verifySignature(
   secret: string,
   webhookId: string,
@@ -21,37 +25,36 @@ export function verifySignature(
   body: string,
   signature: string,
 ): boolean {
-  if (!secret || !signature || !signature.includes(",")) return false;
-  const [version, encoded] = [
-    signature.slice(0, signature.indexOf(",")),
-    signature.slice(signature.indexOf(",") + 1),
-  ];
-  if (version !== "v1") return false;
-
+  if (!secret || !signature) return false;
   const expected = createHmac("sha256", secret)
     .update(`${webhookId}.${timestamp}.${body}`)
     .digest();
-  let given: Buffer;
-  try {
-    given = Buffer.from(encoded, "base64");
-  } catch {
-    return false;
+
+  for (const entry of signature.split(" ")) {
+    const comma = entry.indexOf(",");
+    if (comma < 0 || entry.slice(0, comma) !== "v1") continue;
+    let given: Buffer;
+    try {
+      given = Buffer.from(entry.slice(comma + 1), "base64");
+    } catch {
+      continue;
+    }
+    // timingSafeEqual throws on a length mismatch, which is itself a rejection.
+    if (given.length === expected.length && timingSafeEqual(expected, given)) return true;
   }
-  // timingSafeEqual throws on a length mismatch, which is itself a rejection.
-  if (given.length !== expected.length) return false;
-  return timingSafeEqual(expected, given);
+  return false;
 }
 
 export function documentIdFrom(event: any): string | null {
   return event?.payload?.document?.id ?? event?.payload?.documentId ?? null;
 }
 
-export interface QueueItem {
+interface QueueItem {
   docId: string;
   receivedAt: number;
 }
 
-export function createWebhookServer(
+function createWebhookServer(
   config: Config,
   ports: Ports,
   secret: string,

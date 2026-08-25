@@ -3,7 +3,11 @@ node_modules
 .github
 *.md
 LICENSE
-compose.example.yaml
 config.toml
 state/
 src/generated
+**/*.test.ts
+eslint.config.js
+.prettierrc
+.prettierignore
+CONTRIBUTING.md
