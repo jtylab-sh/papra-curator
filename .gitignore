@@ -1,0 +1,13 @@
+# Your real config: it carries the organization id and, if you enable the
+# flights handler, the archive owner's names. config.example.toml is the
+# committed template.
+config.toml
+
+# Per-document tracking DB. Generated, and it records what has already been
+# paid for at the model — losing it means paying again.
+state/
+*.sqlite
+*.sqlite-journal
+
+node_modules/
+.DS_Store

@@ -1,0 +1,116 @@
+# papra-curator — owns tagging, renaming and downstream handlers for Papra.
+#
+# Copy to config.toml and fill in the marked values. config.toml is gitignored;
+# this template is not, so keep secrets and personal details out of it.
+#
+# This replaces Papra's native AI auto-tagging: set AI_IS_ENABLED=false and
+# AUTO_TAGGING_ENABLED=false on the Papra container once this is running. Papra
+# tags each document exactly once with maxRetries=0 and exposes no re-tag API,
+# so a single 429 leaves a document permanently untagged, and improving a tag
+# description never reaches documents already ingested. Owning the pipeline buys
+# retry, re-processing on a prompt change, and one model call that decides tags
+# AND filename together.
+#
+# Secrets come from the environment, never this file:
+#   MISTRAL_API_KEY, PAPRA_API_KEY, PAPRA_WEBHOOK_SECRET,
+#   AIRTRAIL_KEY, AIRTRAIL_USER_ID   (the last two only if flights are enabled)
+
+[papra]
+# Read-only. Content is read straight from Papra's SQLite (journal_mode=delete,
+# so a reader needs no lock files); every write goes through the HTTP API.
+# Identity and hostnames come from the environment, so this file stays free of
+# anything personal and can be committed as-is. Set these in compose:
+#   PAPRA_DB_PATH  PAPRA_API_URL  PAPRA_ORGANIZATION_ID
+#   AIRTRAIL_URL   AIRTRAIL_OWNER_NAMES   NTFY_URL  NTFY_TOPIC
+# A value written here is used only when the matching variable is unset.
+db_path = ""
+api_url = ""
+organization_id = ""
+# Characters of OCR text sent to the model. Signal sits near the top of a
+# document, and a long one can run to a million characters.
+content_limit = 30000
+
+[trigger]
+# Only used by `--serve`. Papra blocks webhook URLs pointing at private or
+# reserved addresses by default, so Papra ITSELF needs
+#   WEBHOOK_URL_ALLOWED_HOSTNAMES=papra-curator
+# or deliveries are dropped with no error visible on this side.
+listen_host = "0.0.0.0"
+listen_port = 8099
+# Periodic sweep, in seconds. 0 disables it, which is the default on purpose:
+# a sweep re-runs every document whose stage is missing or stale, so on a cold
+# state DB it is a full-archive backfill costing one model call per document.
+# Backfill deliberately with `--once --limit N`, and only turn this on once the
+# state DB is warm.
+reconcile_interval_seconds = 0
+# Wait this long after document:created before processing. Papra extracts text
+# asynchronously, so acting on the webhook immediately can read empty content.
+content_settle_seconds = 20
+
+[model]
+name = "mistral-medium-latest"
+temperature = 0.0
+# Retries per stage before a document is parked with an error. This is the whole
+# reason for replacing native tagging, which retries zero times.
+max_attempts = 3
+retry_backoff_seconds = 20
+
+[tagging]
+enabled = true
+# Bump to re-tag every document on the next sweep. Any string; changing it is
+# what makes an improved prompt or tag vocabulary reach existing documents.
+# It costs one model call per document, so treat a bump as a spend decision.
+prompt_version = "1"
+max_tags = 8
+# false = the model may only pick tags that already exist, enforced in the JSON
+# schema rather than the prompt. With a loose vocabulary an LLM invents
+# per-document facts as tags ("Real Estate Price: EUR 295,000"). Seed your tags
+# with good DESCRIPTIONS first — the model reads name and description both.
+allow_new_tags = false
+
+[renaming]
+enabled = true
+prompt_version = "1"
+# The model fills these four fields and the code composes the name, so it can
+# never return a path, a traversal or a 300-character filename.
+# {detail} is dropped when empty.
+template = "{date}_{party}_{doctype}_{detail}"
+# Applied per field: lowercase, ASCII-fold, non-alphanumerics to hyphen.
+slugify_fields = true
+max_length = 120
+# true = compute and STORE the proposed name but do not call Papra. The
+# proposals accumulate in the state DB; read a batch, then apply them with
+#   --apply-renames        (zero model calls: the names are already decided)
+# Leave this on until you have read some proposals.
+#
+# The original filename is never lost either way: Papra keeps it in its own
+# `original_name` column, which the rename API does not touch.
+dry_run = true
+
+[handlers.flights]
+# Second model call, made ONLY when the tags just applied include one of `tags`.
+# That gate is the cost control: a non-travel document costs exactly one call.
+# Off by default — this pushes to AirTrail (https://github.com/johanohly/AirTrail)
+# and is useless without it.
+enabled = false
+prompt_version = "1"
+tags = ["viaggi"]
+airtrail_url = ""    # AIRTRAIL_URL
+# AIRTRAIL_OWNER_NAMES, pipe-separated. A segment becomes a flight only when one
+# of these names appears in the document's PASSENGER list — being the booker,
+# payer or addressee is not enough, because flights booked for family are still
+# addressed to the account owner. List every spelling airlines print, e.g.
+#   AIRTRAIL_OWNER_NAMES="Jane Doe|DOE/JANE|DOE, JANE"
+owner_names = []
+# A segment whose flight number already exists within this many days counts as a
+# duplicate. Models slip a day on overnight connections, and the (date, route)
+# dedup key cannot catch that.
+near_duplicate_days = 2
+dry_run = false
+
+[notify]
+# ntfy (https://ntfy.sh). Leave `topic` empty to disable notifications.
+url = ""             # NTFY_URL
+topic = ""           # NTFY_TOPIC — empty disables notifications
+# Notify on every applied change, or only on failures.
+on_success = true
