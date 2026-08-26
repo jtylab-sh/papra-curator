@@ -47,7 +47,16 @@ export function verifySignature(
 }
 
 export function documentIdFrom(event: any): string | null {
-  return event?.payload?.document?.id ?? event?.payload?.documentId ?? null;
+  // Papra's real wire shape (observed from a live delivery, 2026-08-26):
+  //   { "data": { "documentId": "doc_..." }, "type": "document:created", ... }
+  // The payload.* forms were a pre-release guess; kept as fallbacks in case
+  // other Papra versions differ.
+  return (
+    event?.data?.documentId ??
+    event?.payload?.document?.id ??
+    event?.payload?.documentId ??
+    null
+  );
 }
 
 interface QueueItem {
@@ -113,7 +122,7 @@ function createWebhookServer(
       const docId = documentIdFrom(event);
       if (docId) {
         onDocument(docId);
-        ports.log(`webhook: ${(event as any)?.event} -> ${docId}`);
+        ports.log(`webhook: ${(event as any)?.type ?? (event as any)?.event} -> ${docId}`);
       }
     });
   });

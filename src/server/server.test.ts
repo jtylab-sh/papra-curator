@@ -39,8 +39,23 @@ describe("webhook signature", () => {
   });
 
   it("finds the document id in both payload shapes", async () => {
+    // Papra's actual wire payload, captured verbatim from a live delivery.
+    assert.equal(
+      documentIdFrom({
+        data: {
+          documentId: "doc_aoidcysjnos58rohsbqwdywh",
+          organizationId: "org_x",
+          name: "Bollettino (26-03-2026)_020.pdf",
+          createdAt: "2026-08-26T09:58:00.558Z",
+        },
+        type: "document:created",
+        timestamp: "2026-08-26T09:58:00.569Z",
+      }),
+      "doc_aoidcysjnos58rohsbqwdywh",
+    );
     assert.equal(documentIdFrom({ payload: { document: { id: "d1" } } }), "d1");
     assert.equal(documentIdFrom({ payload: { documentId: "d2" } }), "d2");
     assert.equal(documentIdFrom({ payload: {} }), null);
+    assert.equal(documentIdFrom({ data: {} }), null);
   });
 });
