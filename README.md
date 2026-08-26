@@ -56,8 +56,8 @@ document:updated webhook ─┐
 
 **1. Create a Papra API key** (Settings → API keys) with `documents:update`,
 `tags:read`, `tags:update`, `custom-properties:read`,
-`custom-properties:create` — and `tags:create` only if you enable
-`allow_new_tags`.
+`custom-properties:create`, `custom-properties:update` — and `tags:create`
+only if you enable `allow_new_tags`.
 
 **2. Add the service** next to Papra:
 
