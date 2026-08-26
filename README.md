@@ -274,7 +274,7 @@ Two rules are enforced in code rather than trusted to the model:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development, tests and releases.
 
-> Written by an AI agent (Claude); reviewed and run in production by a human.
+> Written by an AI agent (Claude); reviewed by a human.
 
 ## License
 
