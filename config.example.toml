@@ -75,6 +75,11 @@ template = "{date}_{party}_{doctype}_{detail}"
 # Applied per field: lowercase, ASCII-fold, non-alphanumerics to hyphen.
 slugify_fields = true
 max_length = 120
+# When a document is renamed, its uploaded filename is preserved as a Papra
+# custom property with this name, visible in the document view. The property
+# definition is created automatically on first use (the API key needs the
+# custom-properties:create permission). Empty string disables it.
+original_name_property = "Original name"
 # true = compute and STORE the proposed name but do not call Papra. The
 # proposals accumulate in the state DB; read a batch, then apply them with
 #   --apply-renames        (zero model calls: the names are already decided)

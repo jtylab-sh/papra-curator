@@ -30,6 +30,10 @@ export interface Ports {
   createTag(name: string, description?: string): Promise<string | null>;
   renameDocument(docId: string, newName: string): Promise<void>;
 
+  customPropertyId(name: string): string | null;
+  createCustomProperty(name: string): Promise<string | null>;
+  setCustomProperty(docId: string, propertyId: string, value: string): Promise<void>;
+
   listFlights(): Promise<AirtrailFlight[]>;
   saveFlight(body: unknown): Promise<void>;
 
@@ -97,6 +101,10 @@ export function createPorts(
     applyTag: (docId, tagId) => writer.applyTag(docId, tagId),
     createTag: (name, description) => writer.createTag(name, description),
     renameDocument: (docId, newName) => writer.renameDocument(docId, newName),
+    customPropertyId: (name) => reader.customPropertyId(name),
+    createCustomProperty: (name) => writer.createCustomProperty(name),
+    setCustomProperty: (docId, propertyId, value) =>
+      writer.setCustomProperty(docId, propertyId, value),
 
     async listFlights() {
       const answer = await requestJson(`${airtrail}/api/flight/list`, {

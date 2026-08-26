@@ -36,6 +36,7 @@ template = "{date}_{party}_{doctype}_{detail}"
 slugify_fields = true
 max_length = 120
 dry_run = false
+original_name_property = "Original name"
 
 [handlers.flights]
 enabled = true
@@ -81,6 +82,9 @@ export class FakePorts implements Ports {
   appliedTags: string[] = [];
   createdTags: string[] = [];
   renames: { docId: string; name: string }[] = [];
+  customPropertyIds: Record<string, string> = {};
+  createdProperties: string[] = [];
+  setProperties: { docId: string; propertyId: string; value: string }[] = [];
   savedFlights: unknown[] = [];
   notifications: { title: string; priority: string }[] = [];
   logs: string[] = [];
@@ -115,6 +119,18 @@ export class FakePorts implements Ports {
   async renameDocument(docId: string, newName: string): Promise<void> {
     if (this.failOn["rename"]) throw new Error(this.failOn["rename"]);
     this.renames.push({ docId, name: newName });
+  }
+  customPropertyId(name: string): string | null {
+    return this.customPropertyIds[name] ?? null;
+  }
+  async createCustomProperty(name: string): Promise<string | null> {
+    this.createdProperties.push(name);
+    const id = `cp-${name}`;
+    this.customPropertyIds[name] = id;
+    return id;
+  }
+  async setCustomProperty(docId: string, propertyId: string, value: string): Promise<void> {
+    this.setProperties.push({ docId, propertyId, value });
   }
   async listFlights(): Promise<AirtrailFlight[]> {
     return this.existingFlights;

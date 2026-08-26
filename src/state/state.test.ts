@@ -76,7 +76,7 @@ describe("stage tracking", () => {
     await state.setStage("d3", "renaming", "skipped", "1", { result: { from: "x.pdf", to: null } });
     await state.setStage("d4", "renaming", "done", "1", { result: { from: "a.pdf", to: "b.pdf" } });
     assert.deepEqual(await state.pendingRenames(), [
-      { docId: "d1", from: "old.pdf", to: "new.pdf" },
+      { docId: "d1", from: "old.pdf", to: "new.pdf", originalName: "" },
     ]);
   });
 });

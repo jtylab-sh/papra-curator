@@ -62,18 +62,23 @@ export function cataloguePrompt(config: Config, tags: Tag[]): string {
     "- Tag what the document IS, not everything it mentions in passing.",
     "",
     "FILENAME FIELDS",
-    "- date: the date the document is ABOUT (issue/transaction/travel date), as " +
-      "YYYY-MM-DD. Use YYYY-MM or YYYY if that is all the document supports. " +
-      "Empty string if genuinely undated. Never today's date.",
+    "The four fields are joined into one filename, so keep each one short — the " +
+      "whole name should stay well under 80 characters.",
+    "- date: the date the document was ISSUED, written or emitted, as " +
+      "YYYY-MM-DD. Not other dates it mentions: not travel dates, due dates, " +
+      "billing periods or future events — a boarding pass issued in March for a " +
+      "July flight is dated March. Use YYYY-MM or YYYY if that is all the " +
+      "document supports. Empty string if genuinely undated. Never today's date.",
     "- party: the organisation or person the document is with — the issuer, " +
-      "supplier, airline, bank or authority. Short form: 'enel' not " +
+      "supplier, airline, bank or authority. One or two words: 'enel' not " +
       "'Enel Energia S.p.A.'. Empty if there is none.",
     "- doctype: what kind of document it is, 2-3 words max, lowercase, in " +
       "Italian if the document is Italian: 'bolletta luce', 'busta paga', " +
       "'carta imbarco', 'contratto affitto'.",
-    "- detail: one short distinguishing detail when it helps tell near-identical " +
-      "documents apart (a route like 'mxp-tfu', a month, an invoice number). " +
-      "Empty string when nothing adds value.",
+    "- detail: ONE short distinguishing detail, 3 words max, only when it helps " +
+      "tell near-identical documents apart (a route like 'mxp-tfu', a month, an " +
+      "invoice number). Empty string when nothing adds value — most documents " +
+      "need none.",
     "",
     "Return facts from the document only. Never guess a date or a party.",
   ].join("\n");

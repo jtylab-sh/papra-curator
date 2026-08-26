@@ -117,6 +117,21 @@ export class PapraReader {
     }
   }
 
+  /** Id of an organization custom-property definition by display name, or null when it does not exist. */
+  customPropertyId(name: string): string | null {
+    const db = this.open();
+    try {
+      const row = db
+        .prepare(
+          "select id from custom_property_definitions where organization_id = ? and name = ?",
+        )
+        .get(this.config.papra.organizationId, name) as { id: string } | undefined;
+      return row?.id ?? null;
+    } finally {
+      db.close();
+    }
+  }
+
   documentTags(docId: string): string[] {
     const db = this.open();
     try {
@@ -161,6 +176,23 @@ export class PapraWriter {
       timeoutMs: 60_000,
     });
     return answer?.tag?.id ?? null;
+  }
+
+  /** Create a text custom-property definition; the API key needs the custom-properties:create permission. */
+  async createCustomProperty(name: string): Promise<string | null> {
+    const answer = await requestJson(`${papraBase(this.config)}/custom-properties`, {
+      payload: { name, type: "text" },
+      token: this.apiKey,
+      timeoutMs: 60_000,
+    });
+    return answer?.propertyDefinition?.id ?? null;
+  }
+
+  async setCustomProperty(docId: string, propertyId: string, value: string): Promise<void> {
+    await requestJson(
+      `${papraBase(this.config)}/documents/${docId}/custom-properties/${propertyId}`,
+      { payload: { value }, method: "PUT", token: this.apiKey, timeoutMs: 60_000 },
+    );
   }
 
   /**

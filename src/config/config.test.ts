@@ -46,7 +46,8 @@ describe("config", () => {
 
   it("defaults renaming.dry_run to true when the key is absent", async () => {
     const parsed = parseConfig(
-      CONFIG_TOML.replace("dry_run = false\n\n[handlers.flights]", "\n[handlers.flights]"),
+      // Strips the [renaming] dry_run line (the first dry_run in the file).
+      CONFIG_TOML.replace("dry_run = false\n", ""),
     );
     assert.equal(parsed.renaming.dryRun, true, "an unset dry_run must not mean rename everything");
   });

@@ -173,6 +173,32 @@ describe("pipeline", () => {
     assert.equal(await state.stageRow("doc1", "tagging"), null);
   });
 
+  it("preserves the uploaded filename as a custom property on rename, creating it once", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    await run(config(), document({ originalName: "IMG_2043 scan.pdf" }));
+    assert.deepEqual(ports.createdProperties, ["Original name"]);
+    assert.deepEqual(ports.setProperties, [
+      { docId: "doc1", propertyId: "cp-Original name", value: "IMG_2043 scan.pdf" },
+    ]);
+
+    // Second document: the definition already exists and is only reused.
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    await run(config(), document({ id: "doc2", name: "b.pdf", originalName: "b.pdf" }));
+    assert.deepEqual(ports.createdProperties, ["Original name"], "created exactly once");
+    assert.equal(ports.setProperties.length, 2);
+  });
+
+  it("touches no custom property when original_name_property is empty or nothing renamed", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    await run(
+      config((draft) => {
+        draft.renaming.originalNameProperty = "";
+      }),
+    );
+    assert.deepEqual(ports.createdProperties, []);
+    assert.deepEqual(ports.setProperties, []);
+  });
+
   it("skips the rename call when renaming.dry_run is on but stores the proposal", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"], { party: "Enel", doctype: "bolletta" });
     await run(

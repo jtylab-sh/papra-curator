@@ -29,6 +29,8 @@ export interface RenameProposal {
   docId: string;
   from: string;
   to: string;
+  /** The uploaded filename recorded when the document was first processed. */
+  originalName: string;
 }
 
 export class State {
@@ -143,6 +145,11 @@ export class State {
       where: { stage: "renaming", status: "skipped" },
       select: { docId: true, result: true },
     });
+    const documents = await this.prisma.document.findMany({
+      where: { docId: { in: rows.map((row) => row.docId) } },
+      select: { docId: true, originalName: true },
+    });
+    const originalNames = new Map(documents.map((doc) => [doc.docId, doc.originalName]));
     const proposals: RenameProposal[] = [];
     for (const row of rows) {
       if (!row.result) continue;
@@ -155,7 +162,12 @@ export class State {
       const from = typeof parsed.from === "string" ? parsed.from : "";
       const to = typeof parsed.to === "string" ? parsed.to : "";
       if (!to || to === from) continue;
-      proposals.push({ docId: row.docId, from, to });
+      proposals.push({
+        docId: row.docId,
+        from,
+        to,
+        originalName: originalNames.get(row.docId) ?? "",
+      });
     }
     return proposals;
   }

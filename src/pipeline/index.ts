@@ -93,7 +93,10 @@ export async function runTaggingAndRename(
 
     const renameDry = dryRun || config.renaming.dryRun;
     renamed = Boolean(proposed && proposed !== doc.name && !renameDry);
-    if (renamed) await ports.renameDocument(doc.id, proposed!);
+    if (renamed) {
+      await ports.renameDocument(doc.id, proposed!);
+      await recordOriginalName(config, ports, doc.id, doc.originalName || doc.name);
+    }
     // Recorded even when skipped, and the proposal is stored: `--apply-renames`
     // can then write these through later with no further model call.
     await state.setStage(
@@ -109,6 +112,26 @@ export async function runTaggingAndRename(
   }
 
   return { applied, proposed, renamed };
+}
+
+/**
+ * Preserve the uploaded filename as a Papra custom property when renaming.
+ *
+ * Papra keeps `original_name` in its own column, but nothing in its UI shows
+ * it; a custom property does. The property definition is created on first use.
+ */
+async function recordOriginalName(
+  config: Config,
+  ports: Ports,
+  docId: string,
+  originalName: string,
+): Promise<void> {
+  const propertyName = config.renaming.originalNameProperty;
+  if (!propertyName || !originalName) return;
+  const propertyId =
+    ports.customPropertyId(propertyName) ?? (await ports.createCustomProperty(propertyName));
+  if (!propertyId) return;
+  await ports.setCustomProperty(docId, propertyId, originalName);
 }
 
 export async function processDocument(
@@ -251,6 +274,12 @@ export async function applyPendingRenames(
     try {
       if (!dryRun) {
         await ports.renameDocument(proposal.docId, proposal.to);
+        await recordOriginalName(
+          config,
+          ports,
+          proposal.docId,
+          proposal.originalName || proposal.from,
+        );
         await state.setStage(proposal.docId, "renaming", "done", config.renaming.promptVersion, {
           result: { from: proposal.from, to: proposal.to, applied: true },
         });

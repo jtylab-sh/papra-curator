@@ -52,6 +52,7 @@ export interface Config {
     slugifyFields: boolean;
     maxLength: number;
     dryRun: boolean;
+    originalNameProperty: string;
   };
   flights: {
     enabled: boolean;
@@ -187,6 +188,7 @@ export function parseConfig(text: string): Config {
       // Defaults to a safety rail: an unset dry_run must never mean "rename
       // everything in the archive".
       dryRun: bool(renaming, "dry_run", "renaming", true),
+      originalNameProperty: str(renaming, "original_name_property", "renaming", "Original name"),
     },
     flights: {
       // Defaults OFF: this handler pushes to a third-party service and is

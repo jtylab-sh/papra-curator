@@ -12,8 +12,9 @@ document permanently untagged. papra-curator owns that pipeline instead:
   its `prompt_version` and the next sweep picks every document up again.
 - **Decides tags and filename in one model call**, so both reflect the same
   reading of the document: `scan_0043.pdf` becomes
-  `2024-10-26_enel_bolletta-luce_ottobre.pdf`. Papra keeps the original name,
-  so a rename is always revertible.
+  `2024-10-26_enel_bolletta-luce_ottobre.pdf`. The uploaded filename is
+  preserved in an `Original name` custom property (created automatically), so
+  a rename never loses information.
 - **Files flights** (optional): documents tagged as travel get a second model
   call that extracts flight segments into
   [AirTrail](https://github.com/johanohly/AirTrail).
@@ -54,7 +55,8 @@ document:updated webhook ─┐
 ## Setup
 
 **1. Create a Papra API key** (Settings → API keys) with `documents:update`,
-`tags:read`, `tags:update` — and `tags:create` only if you enable
+`tags:read`, `tags:update`, `custom-properties:read`,
+`custom-properties:create` — and `tags:create` only if you enable
 `allow_new_tags`.
 
 **2. Add the service** next to Papra:
@@ -177,14 +179,14 @@ sources.
 
 ### Environment variables
 
-| Variable               | Required            | Purpose                                              |
-| ---------------------- | ------------------- | ---------------------------------------------------- |
-| `MISTRAL_API_KEY`      | when `spend = true` | model API key                                        |
-| `PAPRA_API_KEY`        | always              | Papra API key (writes)                               |
-| `PAPRA_WEBHOOK_SECRET` | for `--serve`       | webhook HMAC secret, same value as in Papra's UI     |
-| `AIRTRAIL_KEY`         | when flights on     | AirTrail API key                                     |
-| `DATABASE_URL`         | optional            | state DB location (default `file:/state/curator.db`) |
-| `CURATOR_CONFIG`       | optional            | config path (default `/app/config.toml`)             |
+| Variable               | Required            | Purpose                                                |
+| ---------------------- | ------------------- | ------------------------------------------------------ |
+| `MISTRAL_API_KEY`      | when `spend = true` | model API key                                          |
+| `PAPRA_API_KEY`        | always              | Papra API key (writes; permissions in [Setup](#setup)) |
+| `PAPRA_WEBHOOK_SECRET` | for `--serve`       | webhook HMAC secret, same value as in Papra's UI       |
+| `AIRTRAIL_KEY`         | when flights on     | AirTrail API key                                       |
+| `DATABASE_URL`         | optional            | state DB location (default `file:/state/curator.db`)   |
+| `CURATOR_CONFIG`       | optional            | config path (default `/app/config.toml`)               |
 
 ### config.toml
 
@@ -210,6 +212,7 @@ sources.
 | `[renaming] template`                    | — (required)         | e.g. `"{date}_{party}_{doctype}_{detail}"`; empty fields collapse       |
 | `[renaming] slugify_fields`              | `true`               | lowercase, ASCII-fold, non-alphanumerics to hyphens                     |
 | `[renaming] max_length`                  | `120`                | name length cap, extension excluded                                     |
+| `[renaming] original_name_property`      | `"Original name"`    | custom property that keeps the uploaded filename; `""` disables         |
 | `[renaming] dry_run`                     | `true`               | store proposals instead of renaming; apply later with `--apply-renames` |
 | `[handlers.flights] enabled`             | `false`              | file flights into AirTrail                                              |
 | `[handlers.flights] prompt_version`      | — (required)         | bump to re-extract flights on the next sweep                            |
