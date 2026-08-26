@@ -32,7 +32,6 @@ export interface Config {
     listenHost: string;
     listenPort: number;
     reconcileIntervalSeconds: number;
-    contentSettleSeconds: number;
   };
   model: {
     name: string;
@@ -164,7 +163,6 @@ export function parseConfig(text: string): Config {
       listenHost: str(trigger, "listen_host", "trigger", "0.0.0.0"),
       listenPort: num(trigger, "listen_port", "trigger", 8099),
       reconcileIntervalSeconds: num(trigger, "reconcile_interval_seconds", "trigger", 0),
-      contentSettleSeconds: num(trigger, "content_settle_seconds", "trigger", 20),
     },
     model: {
       name: str(model, "name", "model"),

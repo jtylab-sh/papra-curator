@@ -11,7 +11,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { Config } from "#~/config/index.ts";
-import type { ProcessOutcome } from "#~/pipeline/index.ts";
 import type { Ports } from "#~/ports/index.ts";
 
 /**
@@ -52,18 +51,18 @@ export function documentIdFrom(event: any): string | null {
   // The payload.* forms were a pre-release guess; kept as fallbacks in case
   // other Papra versions differ.
   return (
-    event?.data?.documentId ??
-    event?.payload?.document?.id ??
-    event?.payload?.documentId ??
-    null
+    event?.data?.documentId ?? event?.payload?.document?.id ?? event?.payload?.documentId ?? null
   );
 }
 
-interface QueueItem {
-  docId: string;
-  receivedAt: number;
-  /** How often this document came up with no extracted text yet. */
-  deferrals: number;
+/**
+ * The service subscribes to `document:updated`, whose payload carries the
+ * changed fields. Only a change that wrote extracted text is worth processing;
+ * renames (including this service's own), note and date edits are ignored.
+ */
+export function hasExtractedContent(event: any): boolean {
+  const content = event?.data?.content ?? event?.payload?.content;
+  return typeof content === "string" && content.trim() !== "";
 }
 
 function createWebhookServer(
@@ -120,10 +119,14 @@ function createWebhookServer(
       response.end("{}");
 
       const docId = documentIdFrom(event);
-      if (docId) {
-        onDocument(docId);
-        ports.log(`webhook: ${(event as any)?.type ?? (event as any)?.event} -> ${docId}`);
+      if (!docId) return;
+      const type = (event as any)?.type ?? (event as any)?.event;
+      if (!hasExtractedContent(event)) {
+        ports.log(`webhook: ${type} -> ${docId} (no content change, ignored)`);
+        return;
       }
+      onDocument(docId);
+      ports.log(`webhook: ${type} -> ${docId}`);
     });
   });
 }
@@ -140,7 +143,7 @@ export async function serve(
   ports: Ports,
   secret: string,
   handlers: {
-    processDocument: (docId: string) => Promise<ProcessOutcome>;
+    processDocument: (docId: string) => Promise<void>;
     reconcile: () => Promise<void>;
   },
 ): Promise<void> {
@@ -151,9 +154,9 @@ export async function serve(
     );
   }
 
-  const queue: QueueItem[] = [];
+  const queue: string[] = [];
   const server = createWebhookServer(config, ports, secret, (docId) => {
-    queue.push({ docId, receivedAt: Date.now(), deferrals: 0 });
+    queue.push(docId);
   });
 
   await new Promise<void>((resolve) => {
@@ -161,7 +164,6 @@ export async function serve(
   });
   ports.log(`listening on ${config.trigger.listenHost}:${config.trigger.listenPort}`);
 
-  const settleMs = config.trigger.contentSettleSeconds * 1000;
   const intervalMs = config.trigger.reconcileIntervalSeconds * 1000;
   let lastSweep = Date.now(); // NOT 0: no sweep at startup.
   if (intervalMs > 0) {

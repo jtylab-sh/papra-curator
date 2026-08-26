@@ -111,9 +111,6 @@ export async function runTaggingAndRename(
   return { applied, proposed, renamed };
 }
 
-/** "deferred" = Papra has not finished extracting text; worth retrying soon. */
-export type ProcessOutcome = "done" | "deferred";
-
 export async function processDocument(
   config: Config,
   state: State,
@@ -121,26 +118,27 @@ export async function processDocument(
   docId: string,
   doc: Document | null,
   options: RunOptions = {},
-): Promise<ProcessOutcome> {
+): Promise<void> {
   const dryRun = options.dryRun ?? false;
   const force = options.force ?? false;
 
   if (doc === null) {
     ports.log(`  ${docId}: not found or deleted`);
-    return "done";
+    return;
   }
   if (!config.model.spend) {
     // Skipped, not failed: recording an error here would burn one of the
     // document's `max_attempts` for every delivery received while spending is
     // off, and park it for good before it was ever tried.
     ports.log(`  ${doc.name.slice(0, 50)}: [model] spend is false, leaving untouched`);
-    return "done";
+    return;
   }
   if (!doc.content.trim()) {
-    // Papra extracts text asynchronously; an empty content column means it has
-    // not finished, not that the document is empty.
-    ports.log(`  ${doc.name.slice(0, 50)}: no extracted content yet`);
-    return "deferred";
+    // Nothing recorded: the model only ever reads the extracted text, so there
+    // is nothing to classify. If Papra extracts text later, its
+    // document:updated webhook processes the document then.
+    ports.log(`  ${doc.name.slice(0, 50)}: no extracted content, skipping`);
+    return;
   }
   if (!dryRun) await state.recordDocument(doc.id, doc.content, doc.originalName);
 
@@ -185,20 +183,20 @@ export async function processDocument(
           "high",
         );
       }
-      return "done";
+      return;
     }
   }
 
   // Second model call only for documents the tags say are travel. This gate is
   // the cost control: everything else stops here having used exactly one call.
-  if (!config.flights.enabled) return "done";
+  if (!config.flights.enabled) return;
   const wanted = new Set(config.flights.tags.map((tag) => tag.toLowerCase()));
-  if (!applied.some((tag) => wanted.has(tag.toLowerCase()))) return "done";
+  if (!applied.some((tag) => wanted.has(tag.toLowerCase()))) return;
   if (
     !force &&
     !(await state.stageNeedsRun(doc.id, "flights", config.flights.promptVersion, maxAttempts))
   ) {
-    return "done";
+    return;
   }
 
   const flightsDry = dryRun || config.flights.dryRun;
@@ -226,7 +224,7 @@ export async function processDocument(
       await ports.notify("papra-curator error", `${doc.name}: flights failed: ${message}`, "high");
     }
   }
-  return "done";
+  return;
 }
 
 /**
