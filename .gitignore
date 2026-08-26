@@ -5,7 +5,7 @@ config.toml
 
 # Per-document tracking DB. Generated, and it records what has already been
 # paid for at the model — losing it means paying again.
-state/
+/state/
 *.sqlite
 *.sqlite-journal
 

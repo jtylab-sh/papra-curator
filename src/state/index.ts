@@ -34,9 +34,21 @@ export interface RenameProposal {
 export class State {
   private readonly prisma: PrismaClient;
 
+  private constructor(prisma: PrismaClient) {
+    this.prisma = prisma;
+  }
+
   /** `url` is a Prisma SQLite URL: `file:/state/curator.db`, or `file::memory:`. */
-  constructor(url: string) {
-    this.prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
+  static async open(url: string): Promise<State> {
+    const prisma = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
+    // The serve container and a one-shot `--once` run share this file: a sweep
+    // rename makes Papra fire document:updated at the serve container, which
+    // then writes the same DB mid-sweep. WAL lets a reader and a writer
+    // coexist, and the busy timeout makes a contended write wait instead of
+    // dying with "database is locked".
+    await prisma.$queryRawUnsafe("PRAGMA journal_mode=WAL");
+    await prisma.$queryRawUnsafe("PRAGMA busy_timeout=5000");
+    return new State(prisma);
   }
 
   async close(): Promise<void> {

@@ -145,7 +145,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     { allowSpend: config.model.spend },
   );
   const reader = new PapraReader(config);
-  const state = new State(env.databaseUrl);
+  const state = await State.open(env.databaseUrl);
 
   try {
     if (args.applyRenames) {

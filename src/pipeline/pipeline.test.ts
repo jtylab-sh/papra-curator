@@ -11,7 +11,7 @@ describe("pipeline", () => {
   let ports: FakePorts;
 
   beforeEach(async () => {
-    state = new State("file::memory:");
+    state = await State.open("file::memory:");
     await createSchema(state);
     ports = new FakePorts();
   });

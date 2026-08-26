@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { existsSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, beforeEach } from "node:test";
 
 import { State, createSchema } from "#~/state/index.ts";
@@ -6,7 +9,7 @@ import { State, createSchema } from "#~/state/index.ts";
 describe("stage tracking", () => {
   let state: State;
   beforeEach(async () => {
-    state = new State("file::memory:");
+    state = await State.open("file::memory:");
     await createSchema(state);
   });
 
@@ -35,8 +38,28 @@ describe("stage tracking", () => {
     assert.ok(!(await state.stageNeedsRun("doc1", "renaming", "1", 3)));
   });
 
+  it("opens a file DB in WAL mode and takes a second writer without locking", async () => {
+    // The serve container and a one-shot --once run write this file at the
+    // same time (a sweep rename triggers a webhook back into serve).
+    const path = join(tmpdir(), `curator-state-test-${process.pid}-${Date.now()}.db`);
+    try {
+      const sweep = await State.open(`file:${path}`);
+      await createSchema(sweep);
+      const serve = await State.open(`file:${path}`);
+      await sweep.recordDocument("doc1", "text", "a.pdf");
+      await serve.setStage("doc1", "tagging", "done", "1");
+      await sweep.setStage("doc1", "renaming", "done", "1");
+      assert.ok(existsSync(`${path}-wal`), "the DB must be in WAL journal mode");
+      assert.equal((await sweep.stageRow("doc1", "tagging"))?.status, "done");
+      await sweep.close();
+      await serve.close();
+    } finally {
+      for (const suffix of ["", "-wal", "-shm"]) rmSync(`${path}${suffix}`, { force: true });
+    }
+  });
+
   it("survives being reopened", async () => {
-    const shared = new State("file::memory:");
+    const shared = await State.open("file::memory:");
     await createSchema(shared);
     await shared.recordDocument("doc1", "text", "a.pdf");
     await shared.setStage("doc1", "tagging", "done", "1");
