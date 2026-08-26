@@ -38,11 +38,6 @@ listen_port = 8099
 # Backfill deliberately with `--once --limit N`, and only turn this on once the
 # state DB is warm.
 reconcile_interval_seconds = 0
-# Wait this long after document:created before processing. Papra extracts text
-# asynchronously, so acting on the webhook immediately can read empty content.
-# A document still without text is retried with increasing delays (roughly
-# 55x this value in total), then left for the next sweep.
-content_settle_seconds = 20
 
 [model]
 # false = no model call is ever made, which is the default: a fresh install

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { createHmac } from "node:crypto";
-import { verifySignature, documentIdFrom } from "#~/server/index.ts";
+import { verifySignature, documentIdFrom, hasExtractedContent } from "#~/server/index.ts";
 
 describe("webhook signature", () => {
   const secret = "s3cr3t";
@@ -57,5 +57,13 @@ describe("webhook signature", () => {
     assert.equal(documentIdFrom({ payload: { documentId: "d2" } }), "d2");
     assert.equal(documentIdFrom({ payload: {} }), null);
     assert.equal(documentIdFrom({ data: {} }), null);
+  });
+
+  it("only lets through updates that carry extracted content", async () => {
+    assert.ok(hasExtractedContent({ data: { documentId: "d1", content: "some text" } }));
+    assert.ok(hasExtractedContent({ payload: { content: "some text" } }));
+    assert.ok(!hasExtractedContent({ data: { documentId: "d1", content: "   " } }));
+    assert.ok(!hasExtractedContent({ data: { documentId: "d1", name: "renamed.pdf" } }));
+    assert.ok(!hasExtractedContent({ data: { documentId: "d1" } }));
   });
 });

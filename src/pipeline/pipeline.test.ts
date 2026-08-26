@@ -166,17 +166,11 @@ describe("pipeline", () => {
     assert.match(String((await state.stageRow("doc1", "tagging"))?.result ?? ""), /^$|null/);
   });
 
-  it("defers a document with no extracted content, recording nothing", async () => {
+  it("skips a document with no extracted content, recording nothing", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"]);
-    const outcome = await run(config(), document({ content: "   " }));
-    assert.equal(outcome, "deferred", "the caller must know to retry");
-    assert.deepEqual(ports.modelCalls, [], "no content means nothing to classify yet");
+    await run(config(), document({ content: "   " }));
+    assert.deepEqual(ports.modelCalls, [], "no content means nothing to classify");
     assert.equal(await state.stageRow("doc1", "tagging"), null);
-  });
-
-  it("reports done for a processed document", async () => {
-    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
-    assert.equal(await run(config()), "done");
   });
 
   it("skips the rename call when renaming.dry_run is on but stores the proposal", async () => {

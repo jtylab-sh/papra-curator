@@ -174,30 +174,11 @@ export async function serve(
 
   for (;;) {
     const now = Date.now();
-    // Papra extracts text asynchronously, so a document is not readable the
-    // instant document:created fires. Each deferral waits one settle period
-    // longer than the last, so a slow OCR gets roughly settle * 55 in total.
-    const delayFor = (item: QueueItem) => settleMs * (1 + item.deferrals);
-    const ready = queue.filter((item) => now - item.receivedAt >= delayFor(item));
-    const waiting = queue.filter((item) => now - item.receivedAt < delayFor(item));
-    queue.length = 0;
-    queue.push(...waiting);
-
-    for (const item of ready) {
+    for (const docId of queue.splice(0)) {
       try {
-        const outcome = await handlers.processDocument(item.docId);
-        if (outcome === "deferred") {
-          if (item.deferrals < 9) {
-            queue.push({ docId: item.docId, receivedAt: now, deferrals: item.deferrals + 1 });
-          } else {
-            // Not lost: nothing was recorded, so the next sweep picks it up.
-            ports.log(
-              `  ${item.docId}: still no text after ${item.deferrals + 1} tries, leaving for a sweep`,
-            );
-          }
-        }
+        await handlers.processDocument(docId);
       } catch (error) {
-        ports.log(`  ! ${item.docId}: ${(error as Error).message}`);
+        ports.log(`  ! ${docId}: ${(error as Error).message}`);
       }
     }
 

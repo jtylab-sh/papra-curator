@@ -16,7 +16,6 @@ content_limit = 30000
 listen_host = "0.0.0.0"
 listen_port = 8099
 reconcile_interval_seconds = 0
-content_settle_seconds = 20
 
 [model]
 name = "mistral-medium-latest"

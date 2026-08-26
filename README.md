@@ -25,7 +25,7 @@ on **new ones** (webhook, as they arrive) — same pipeline, see
 ## How it works
 
 ```
-document:created webhook ─┐
+document:updated webhook ─┐
                           ├──► queue ──► [ tag + rename ]   one model call
 --once sweep (backfill) ──┘                     │
                                      travel tag applied?
@@ -134,7 +134,7 @@ decision.
 ### New documents (webhook)
 
 The `--serve` container from the compose file above listens on port `8099`. In
-Papra (Settings → Webhooks) create a webhook for the `document:created` event:
+Papra (Settings → Webhooks) create a webhook for the `document:updated` event:
 
 - URL: `http://papra-curator:8099`
 - Secret: the same value as `PAPRA_WEBHOOK_SECRET` — unsigned requests are
@@ -148,11 +148,11 @@ And on the **Papra** container:
 WEBHOOK_URL_ALLOWED_HOSTNAMES: papra-curator
 ```
 
-Papra extracts text asynchronously, so the service waits
-`content_settle_seconds` before reading a new document, and retries with
-increasing delays (about 20 minutes in total at the default) if the text is
-still not there. A document that never gets text in that window, and any
-delivery lost to a Papra restart, is picked up by the next sweep — so run
+Papra extracts text asynchronously and fires `document:updated` when the text
+is written, so a document is processed the moment it is readable. Updates that
+change anything else (renames — including this service's own — notes, dates)
+are ignored. A document whose extraction produces no text is never tagged.
+Deliveries lost to a Papra restart are picked up by the next sweep — so run
 `--once` now and then, or set `[trigger] reconcile_interval_seconds` once the
 backfill is done.
 
@@ -197,7 +197,6 @@ sources.
 | `[trigger] listen_host`                  | `"0.0.0.0"`          | webhook bind address (`--serve`)                                        |
 | `[trigger] listen_port`                  | `8099`               | webhook port                                                            |
 | `[trigger] reconcile_interval_seconds`   | `0`                  | periodic sweep; `0` = off, first sweep one interval after start         |
-| `[trigger] content_settle_seconds`       | `20`                 | wait after `document:created` for Papra's OCR to finish                 |
 | `[model] spend`                          | `false`              | master switch: no model call while false                                |
 | `[model] name`                           | — (required)         | Mistral model, e.g. `mistral-medium-latest`                             |
 | `[model] temperature`                    | `0.0`                | sampling temperature                                                    |
