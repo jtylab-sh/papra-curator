@@ -43,10 +43,6 @@ subjects since the last tag and bumps accordingly:
 | `feat: …`                                                   | minor |
 | anything else (`fix`, `docs`, `chore`, …)                   | patch |
 
-While the major is still `0` a breaking change is capped at a minor bump: there
-is no compatibility promise to break yet, so nothing reaches `1.0.0` by accident.
-Releasing `1.0.0` is a deliberate act — tag it by hand.
-
 It then creates the tag and a GitHub release with generated notes, and publishes
 the image as `:MAJOR.MINOR.PATCH`, `:MAJOR.MINOR` and `:latest`. Pin a version in
 production; `:latest` moves on every push. Git tags are the source of truth —
