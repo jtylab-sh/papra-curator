@@ -60,6 +60,10 @@ export function cataloguePrompt(config: Config, tags: Tag[]): string {
       ? "- You may propose a new tag only when nothing existing fits."
       : "- Only choose from the tags listed above. Do not invent new tags.",
     "- Tag what the document IS, not everything it mentions in passing.",
+    "- A tag description may ask for a companion tag (e.g. the trip's " +
+      "destination country). Follow that only when a matching tag is in the " +
+      "list above; when none matches, omit it — never substitute a " +
+      "similar-looking tag for a different place, person or thing.",
     "",
     "FILENAME FIELDS",
     "The four fields are joined into one filename, so keep each one short — the " +
