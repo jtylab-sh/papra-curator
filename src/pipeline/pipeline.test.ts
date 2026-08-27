@@ -256,3 +256,76 @@ describe("pipeline", () => {
     );
   });
 });
+
+describe("untagged marker", () => {
+  let state: State;
+  let ports: FakePorts;
+
+  beforeEach(async () => {
+    state = await State.open("file::memory:");
+    await createSchema(state);
+    ports = new FakePorts();
+  });
+
+  const run = (cfg = config(), doc = document(), options = {}) =>
+    processDocument(cfg, state, ports, doc.id, doc, options);
+
+  it("marks a document the model could not place", async () => {
+    ports.answers["catalogue"] = catalogueAnswer([]);
+    await run();
+    assert.deepEqual(ports.createdTags, ["untagged"], "created on first use");
+    assert.deepEqual(ports.appliedTags, ["t-untagged"]);
+    const row = await state.stageRow("doc1", "tagging");
+    assert.deepEqual((row?.result as any).tags, ["untagged"]);
+  });
+
+  it("reuses the existing untagged tag instead of creating it", async () => {
+    ports.tags.push({ id: "t-untagged", name: "untagged", description: "" });
+    ports.answers["catalogue"] = catalogueAnswer([]);
+    await run();
+    assert.deepEqual(ports.createdTags, []);
+    assert.deepEqual(ports.appliedTags, ["t-untagged"]);
+  });
+
+  it("never offers untagged to the model", async () => {
+    ports.tags.push({ id: "t-untagged", name: "untagged", description: "" });
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    await run();
+    assert.equal(ports.systemPrompts.length, 1);
+    assert.ok(!ports.systemPrompts[0].includes("untagged"), "must not appear in the vocabulary");
+  });
+
+  it("leaves a hand-tagged document alone when the model finds nothing", async () => {
+    ports.existingDocumentTags = ["cheatsheet"];
+    ports.answers["catalogue"] = catalogueAnswer([]);
+    await run();
+    assert.deepEqual(ports.appliedTags, [], "already tagged by hand is not untagged");
+  });
+
+  it("does not mark when the model found tags", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    await run();
+    assert.deepEqual(ports.appliedTags, ["t-banca"]);
+    assert.deepEqual(ports.createdTags, []);
+  });
+
+  it("writes nothing at all on a dry run", async () => {
+    ports.answers["catalogue"] = catalogueAnswer([]);
+    await run(config(), document(), { dryRun: true });
+    assert.deepEqual(ports.appliedTags, []);
+    assert.deepEqual(ports.createdTags, [], "a dry run must not even create the tag");
+    assert.equal(await state.stageRow("doc1", "tagging"), null, "dry runs persist nothing");
+  });
+
+  it("only logs when the tag cannot be created", async () => {
+    ports.createTag = async () => {
+      throw new Error("401 from papra: unauthorized");
+    };
+    ports.answers["catalogue"] = catalogueAnswer([]);
+    await run();
+    const row = await state.stageRow("doc1", "tagging");
+    assert.equal(row?.status, "done", "a missing permission must not park the document");
+    assert.deepEqual((row?.result as any).tags, []);
+    assert.ok(ports.logs.some((line) => line.includes("could not apply untagged")));
+  });
+});

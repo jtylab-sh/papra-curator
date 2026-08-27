@@ -18,6 +18,9 @@ import type { Document } from "#~/papra/index.ts";
 import type { Ports } from "#~/ports/index.ts";
 import type { State } from "#~/state/index.ts";
 
+/** Applied when the model finds nothing and the document has no tags at all — see below. */
+export const UNTAGGED = "untagged";
+
 export interface RunOptions {
   dryRun?: boolean;
   force?: boolean;
@@ -41,12 +44,16 @@ export async function runTaggingAndRename(
   const tags = ports.listTags();
   const idByName = new Map(tags.map((tag) => [tag.name, tag.id]));
 
+  // The marker is applied by code below, never offered to the model: in the
+  // vocabulary it would invite "untagged" as a lazy answer for weak documents.
+  const vocabulary = tags.filter((tag) => tag.name !== UNTAGGED);
+
   const answer: CatalogueAnswer = await ports.askModel(
     "catalogue",
-    cataloguePrompt(config, tags),
+    cataloguePrompt(config, vocabulary),
     `Document name: ${doc.originalName || doc.name}\n\n${doc.content.slice(0, config.papra.contentLimit)}`,
     catalogueSchema(
-      tags.map((tag) => tag.name),
+      vocabulary.map((tag) => tag.name),
       config.tagging.allowNewTags,
     ),
   );
@@ -76,6 +83,22 @@ export async function runTaggingAndRename(
       }
       if (!dryRun) await ports.applyTag(doc.id, tagId);
       applied.push(tagName);
+    }
+    if (applied.length === 0 && already.size === 0) {
+      // Nothing fit and nobody tagged it by hand: mark it, so documents the
+      // model could not place are findable instead of looking untouched.
+      // The tag is created on first use (needs the tags:create permission);
+      // failing to mark must not park the document, so errors only log.
+      try {
+        const untaggedId =
+          idByName.get(UNTAGGED) ?? (dryRun ? null : await ports.createTag(UNTAGGED));
+        if (!dryRun && untaggedId) await ports.applyTag(doc.id, untaggedId);
+        if (untaggedId || dryRun) applied.push(UNTAGGED);
+      } catch (error) {
+        ports.log(
+          `  ${doc.name.slice(0, 50)}: could not apply ${UNTAGGED}: ${(error as Error).message}`,
+        );
+      }
     }
     await state.setStage(doc.id, "tagging", "done", config.tagging.promptVersion, {
       result: { tags: applied },

@@ -79,6 +79,7 @@ export function document(overrides: Partial<Document> = {}): Document {
 /** A Ports fake that records every outward effect, so tests can assert on cost. */
 export class FakePorts implements Ports {
   modelCalls: string[] = [];
+  systemPrompts: string[] = [];
   appliedTags: string[] = [];
   createdTags: string[] = [];
   renames: { docId: string; name: string }[] = [];
@@ -98,8 +99,9 @@ export class FakePorts implements Ports {
   answers: Record<string, unknown> = {};
   failOn: Record<string, string> = {};
 
-  async askModel(label: string): Promise<any> {
+  async askModel(label: string, system?: string): Promise<any> {
     this.modelCalls.push(label);
+    if (system !== undefined) this.systemPrompts.push(system);
     if (this.failOn[label]) throw new Error(this.failOn[label]);
     return this.answers[label] ?? {};
   }
