@@ -96,10 +96,18 @@ async function reconcile(
       (options.dryRun ? " — dry run" : ""),
   );
   for (const doc of documents) {
-    await processDocument(config, state, ports, doc.id, doc, {
-      dryRun: options.dryRun,
-      force: options.force,
-    });
+    try {
+      await processDocument(config, state, ports, doc.id, doc, {
+        dryRun: options.dryRun,
+        force: options.force,
+      });
+    } catch (error) {
+      // processDocument records and notifies its own stage failures; what lands
+      // here is a read that died before any stage ran (e.g. Papra's DB still
+      // locked after the busy timeout). One such document must not abort the
+      // rest of the sweep — the next sweep picks it up again.
+      ports.log(`  ! ${doc.name.slice(0, 44)}: ${String((error as Error).message).slice(0, 200)}`);
+    }
   }
 }
 

@@ -3,7 +3,11 @@
  *
  * Reads go straight at Papra's SQLite, opened read-only. That file is on a `:ro`
  * bind mount and Papra runs it in journal_mode=delete, so a reader needs no lock
- * files and cannot disturb the writer.
+ * files. In that journal mode reader and writer still exclude each other
+ * briefly: while Papra commits (e.g. its search-index update right after this
+ * service's own rename/tag API call) a read attempt gets SQLITE_BUSY, so every
+ * connection sets a busy timeout to wait out the commit instead of failing the
+ * whole stage with "database is locked".
  *
  * Writes go through Papra's HTTP API, never the DB, because the schema is
  * Papra's own migration domain and writing behind its back would also leave its
@@ -28,8 +32,10 @@ export interface Tag {
   description: string;
 }
 
-function openReadOnly(dbPath: string): DatabaseSync {
-  return new DatabaseSync(dbPath, { readOnly: true });
+export function openReadOnly(dbPath: string): DatabaseSync {
+  // timeout = sqlite3_busy_timeout: wait for Papra's commit lock to clear
+  // instead of throwing SQLITE_BUSY immediately.
+  return new DatabaseSync(dbPath, { readOnly: true, timeout: 5000 });
 }
 
 const DOCUMENT_COLUMNS =
