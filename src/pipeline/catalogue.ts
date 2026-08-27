@@ -54,8 +54,12 @@ export function cataloguePrompt(config: Config, tags: Tag[]): string {
     ...vocabulary,
     "",
     "TAGS",
-    `- Choose at most ${config.tagging.maxTags}, only genuinely relevant ones. ` +
-      "Fewer is better than forcing a weak match.",
+    `- Choose at most ${config.tagging.maxTags}. Apply a tag only when you are ` +
+      "CERTAIN it fits: the document clearly matches the tag's description, " +
+      "not just its name. If you are not sure a tag applies, leave it out.",
+    "- An empty list is a perfectly good answer. Returning no tags is always " +
+      "better than returning a doubtful one — a missing tag is easy to add by " +
+      "hand, a wrong tag pollutes searches silently.",
     config.tagging.allowNewTags
       ? "- You may propose a new tag only when nothing existing fits."
       : "- Only choose from the tags listed above. Do not invent new tags.",
