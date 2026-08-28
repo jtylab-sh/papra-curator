@@ -41,7 +41,11 @@ export function catalogueSchema(tagNames: string[], allowNew: boolean): object {
   };
 }
 
-export function cataloguePrompt(config: Config, tags: Tag[]): string {
+export function cataloguePrompt(
+  config: Config,
+  tags: Tag[],
+  today: string = new Date().toISOString().slice(0, 10),
+): string {
   const vocabulary = tags.map((tag) =>
     tag.description ? `- ${tag.name}: ${tag.description}` : `- ${tag.name}`,
   );
@@ -77,6 +81,9 @@ export function cataloguePrompt(config: Config, tags: Tag[]): string {
       "billing periods or future events — a boarding pass issued in March for a " +
       "July flight is dated March. Use YYYY-MM or YYYY if that is all the " +
       "document supports. Empty string if genuinely undated. Never today's date.",
+    `- Today is ${today}. Use it only to resolve ambiguous or relative dates: ` +
+      "it is the day the document is being processed, not the day it was " +
+      "issued, so it is never the document's date.",
     "- party: the organisation or person the document is with — the issuer, " +
       "supplier, airline, bank or authority. One or two words: 'enel' not " +
       "'Enel Energia S.p.A.'. Empty if there is none.",

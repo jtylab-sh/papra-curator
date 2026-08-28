@@ -30,7 +30,10 @@ export const FLIGHTS_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-export function flightsPrompt(ownerNames: string[]): string {
+export function flightsPrompt(
+  ownerNames: string[],
+  today: string = new Date().toISOString().slice(0, 10),
+): string {
   return `You extract flight segments from a document's OCR text.
 
 The archive owner is: ${ownerNames.join(" | ")}
@@ -47,5 +50,7 @@ RULES
 4. Other passengers on the same booking go in \`guests\` as full names.
 5. Invent nothing; omit any field the document does not state. If the document is
    not a flight document, return {"flights": []}.
-6. Ignore cancelled bookings and documents that merely quote or advertise flights.`;
+6. Ignore cancelled bookings and documents that merely quote or advertise flights.
+7. Today is ${today}. Use it only to resolve a date whose year the document
+   omits — it is never a travel date itself.`;
 }

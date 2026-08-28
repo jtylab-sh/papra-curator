@@ -76,6 +76,15 @@ describe("pipeline", () => {
     assert.equal(ports.savedFlights.length, 0);
   });
 
+  it("tells the model today's date, in both prompts", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["viaggi"]);
+    ports.answers["flights"] = { flights: [] };
+    await run(config());
+    const today = new Date().toISOString().slice(0, 10);
+    assert.ok(ports.systemPrompts[0].includes(today), "catalogue prompt must state today");
+    assert.ok(ports.systemPrompts[1].includes(today), "flights prompt must state today");
+  });
+
   it("makes the second call only for a travel document", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["viaggi"]);
     ports.answers["flights"] = { flights: [segment()] };
