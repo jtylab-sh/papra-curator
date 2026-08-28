@@ -44,6 +44,7 @@ export interface Config {
     promptVersion: string;
     maxTags: number;
     allowNewTags: boolean;
+    countryProperty: string;
   };
   renaming: {
     enabled: boolean;
@@ -179,6 +180,9 @@ export function parseConfig(text: string): Config {
       promptVersion: version(tagging, "tagging"),
       maxTags: num(tagging, "max_tags", "tagging", 8),
       allowNewTags: bool(tagging, "allow_new_tags", "tagging", false),
+      // Papra text custom property to fill with the document's country
+      // (created on first use); empty disables.
+      countryProperty: str(tagging, "country_property", "tagging", ""),
     },
     renaming: {
       enabled: bool(renaming, "enabled", "renaming", true),

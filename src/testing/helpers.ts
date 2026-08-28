@@ -28,6 +28,7 @@ enabled = true
 prompt_version = "1"
 max_tags = 8
 allow_new_tags = false
+country_property = "country"
 
 [renaming]
 enabled = true

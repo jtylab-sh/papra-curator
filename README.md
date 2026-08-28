@@ -198,44 +198,45 @@ sources.
 
 ### config.toml
 
-| Key                                      | Default              | Meaning                                                                 |
-| ---------------------------------------- | -------------------- | ----------------------------------------------------------------------- |
-| `[papra] db_path`                        | — (required)         | Papra's SQLite file, read-only                                          |
-| `[papra] api_url`                        | — (required)         | Papra base URL                                                          |
-| `[papra] organization_id`                | — (required)         | Papra organization id                                                   |
-| `[papra] content_limit`                  | `30000`              | characters of OCR text sent to the model                                |
-| `[trigger] listen_host`                  | `"0.0.0.0"`          | webhook bind address (`--serve`)                                        |
-| `[trigger] listen_port`                  | `8099`               | webhook port                                                            |
-| `[trigger] reconcile_interval_seconds`   | `0`                  | periodic sweep; `0` = off, first sweep one interval after start         |
-| `[model] spend`                          | `false`              | master switch: no model call while false                                |
-| `[model] name`                           | — (required)         | Mistral model, e.g. `mistral-medium-latest`                             |
-| `[model] temperature`                    | `0.0`                | sampling temperature                                                    |
-| `[model] max_attempts`                   | `3`                  | retries per stage before a document is parked with an error             |
-| `[tagging] enabled`                      | `true`               | tag documents                                                           |
-| `[tagging] prompt_version`               | — (required)         | bump to re-tag everything on the next sweep                             |
-| `[tagging] max_tags`                     | `8`                  | most tags applied per document                                          |
-| `[tagging] allow_new_tags`               | `false`              | let the model create tags (else vocabulary enforced in the schema)      |
-| `[renaming] enabled`                     | `true`               | rename documents                                                        |
-| `[renaming] prompt_version`              | — (required)         | bump to re-decide every name on the next sweep                          |
-| `[renaming] template`                    | — (required)         | e.g. `"{date}_{party}_{doctype}_{detail}"`; empty fields collapse       |
-| `[renaming] slugify_fields`              | `true`               | lowercase, ASCII-fold, non-alphanumerics to hyphens                     |
-| `[renaming] max_length`                  | `120`                | name length cap, extension excluded                                     |
-| `[renaming] original_name_property`      | `"Original name"`    | custom property that keeps the uploaded filename; `""` disables         |
-| `[renaming] dry_run`                     | `true`               | store proposals instead of renaming; apply later with `--apply-renames` |
-| `[handlers.flights] enabled`             | `false`              | file flights into AirTrail                                              |
-| `[handlers.flights] prompt_version`      | — (required)         | bump to re-extract flights on the next sweep                            |
-| `[handlers.flights] tags`                | — (required when on) | your travel tag(s); the gate for the second model call                  |
-| `[handlers.flights] airtrail_url`        | — (required when on) | AirTrail base URL                                                       |
-| `[handlers.flights] owner_user_id`       | — (required when on) | AirTrail user the flights are filed under                               |
-| `[handlers.flights] owner_names`         | — (required when on) | owner spellings; a flight is filed only when one is a passenger         |
-| `[handlers.flights] near_duplicate_days` | `2`                  | same flight number within ± this many days is skipped for review        |
-| `[handlers.flights] dry_run`             | `false`              | extract and log, but do not push to AirTrail                            |
-| `[notify] url` / `[notify] topic`        | `""`                 | ntfy server/topic; empty topic disables all notifications               |
-| `[notify] on_tagged`                     | `false`              | include applied tags in the document's push                             |
-| `[notify] on_renamed`                    | `false`              | include the rename in the document's push (incl. `--apply-renames`)     |
-| `[notify] on_flights`                    | `true`               | include filed flights in the document's push                            |
-| `[notify] on_error`                      | `true`               | push when a stage or sweep fails (high priority)                        |
-| `[notify] on_sweep`                      | `true`               | one summary push per sweep that did anything                            |
+| Key                                      | Default              | Meaning                                                                                             |
+| ---------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
+| `[papra] db_path`                        | — (required)         | Papra's SQLite file, read-only                                                                      |
+| `[papra] api_url`                        | — (required)         | Papra base URL                                                                                      |
+| `[papra] organization_id`                | — (required)         | Papra organization id                                                                               |
+| `[papra] content_limit`                  | `30000`              | characters of OCR text sent to the model                                                            |
+| `[trigger] listen_host`                  | `"0.0.0.0"`          | webhook bind address (`--serve`)                                                                    |
+| `[trigger] listen_port`                  | `8099`               | webhook port                                                                                        |
+| `[trigger] reconcile_interval_seconds`   | `0`                  | periodic sweep; `0` = off, first sweep one interval after start                                     |
+| `[model] spend`                          | `false`              | master switch: no model call while false                                                            |
+| `[model] name`                           | — (required)         | Mistral model, e.g. `mistral-medium-latest`                                                         |
+| `[model] temperature`                    | `0.0`                | sampling temperature                                                                                |
+| `[model] max_attempts`                   | `3`                  | retries per stage before a document is parked with an error                                         |
+| `[tagging] enabled`                      | `true`               | tag documents                                                                                       |
+| `[tagging] prompt_version`               | — (required)         | bump to re-tag everything on the next sweep                                                         |
+| `[tagging] max_tags`                     | `8`                  | most tags applied per document                                                                      |
+| `[tagging] allow_new_tags`               | `false`              | let the model create tags (else vocabulary enforced in the schema)                                  |
+| `[tagging] country_property`             | `""`                 | Papra text custom property filled with the document's country (created on first use); `""` disables |
+| `[renaming] enabled`                     | `true`               | rename documents                                                                                    |
+| `[renaming] prompt_version`              | — (required)         | bump to re-decide every name on the next sweep                                                      |
+| `[renaming] template`                    | — (required)         | e.g. `"{date}_{party}_{doctype}_{detail}"`; empty fields collapse                                   |
+| `[renaming] slugify_fields`              | `true`               | lowercase, ASCII-fold, non-alphanumerics to hyphens                                                 |
+| `[renaming] max_length`                  | `120`                | name length cap, extension excluded                                                                 |
+| `[renaming] original_name_property`      | `"Original name"`    | custom property that keeps the uploaded filename; `""` disables                                     |
+| `[renaming] dry_run`                     | `true`               | store proposals instead of renaming; apply later with `--apply-renames`                             |
+| `[handlers.flights] enabled`             | `false`              | file flights into AirTrail                                                                          |
+| `[handlers.flights] prompt_version`      | — (required)         | bump to re-extract flights on the next sweep                                                        |
+| `[handlers.flights] tags`                | — (required when on) | your travel tag(s); the gate for the second model call                                              |
+| `[handlers.flights] airtrail_url`        | — (required when on) | AirTrail base URL                                                                                   |
+| `[handlers.flights] owner_user_id`       | — (required when on) | AirTrail user the flights are filed under                                                           |
+| `[handlers.flights] owner_names`         | — (required when on) | owner spellings; a flight is filed only when one is a passenger                                     |
+| `[handlers.flights] near_duplicate_days` | `2`                  | same flight number within ± this many days is skipped for review                                    |
+| `[handlers.flights] dry_run`             | `false`              | extract and log, but do not push to AirTrail                                                        |
+| `[notify] url` / `[notify] topic`        | `""`                 | ntfy server/topic; empty topic disables all notifications                                           |
+| `[notify] on_tagged`                     | `false`              | include applied tags in the document's push                                                         |
+| `[notify] on_renamed`                    | `false`              | include the rename in the document's push (incl. `--apply-renames`)                                 |
+| `[notify] on_flights`                    | `true`               | include filed flights in the document's push                                                        |
+| `[notify] on_error`                      | `true`               | push when a stage or sweep fails (high priority)                                                    |
+| `[notify] on_sweep`                      | `true`               | one summary push per sweep that did anything                                                        |
 
 A processed document sends at most **one** push, listing everything done to it;
 the `on_*` switches choose which lines appear, not separate messages. Sweeps

@@ -12,6 +12,7 @@ import { NAME_FIELDS } from "#~/pipeline/naming.ts";
 
 export interface CatalogueAnswer {
   tags: string[];
+  country: string;
   date: string;
   party: string;
   doctype: string;
@@ -35,8 +36,9 @@ export function catalogueSchema(tagNames: string[], allowNew: boolean): object {
       party: { type: "string" },
       doctype: { type: "string" },
       detail: { type: "string" },
+      country: { type: "string" },
     },
-    required: ["tags", ...NAME_FIELDS],
+    required: ["tags", "country", ...NAME_FIELDS],
     additionalProperties: false,
   };
 }
@@ -94,6 +96,11 @@ export function cataloguePrompt(
       "tell near-identical documents apart (a route like 'mxp-tfu', a month, an " +
       "invoice number). Empty string when nothing adds value — most documents " +
       "need none.",
+    "",
+    "COUNTRY",
+    "- country: the single country the document belongs to — where it was " +
+      "issued or the country it concerns. Lowercase English name: 'italy', " +
+      "'romania', 'china'. Empty string when no single country is clear.",
     "",
     "Return facts from the document only. Never guess a date or a party.",
   ].join("\n");

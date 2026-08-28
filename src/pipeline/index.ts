@@ -31,6 +31,8 @@ export interface RunOptions {
 export interface CatalogueResult {
   applied: string[];
   proposed: string | null;
+  /** Country filed into the configured custom property, or null when none was written. */
+  country: string | null;
   /** True when the rename was actually sent to Papra, not proposed or dry-run. */
   renamed: boolean;
 }
@@ -108,6 +110,17 @@ export async function runTaggingAndRename(
     });
   }
 
+  // The same catalogue answer also names the document's country; file it into
+  // a custom property when one is configured — same model call, no extra cost.
+  const country = String(answer?.country ?? "")
+    .trim()
+    .toLowerCase();
+  let filedCountry: string | null = null;
+  if (config.tagging.countryProperty && country && !dryRun) {
+    await setDocumentProperty(ports, config.tagging.countryProperty, doc.id, country);
+    filedCountry = country;
+  }
+
   let proposed: string | null = null;
   let renamed = false;
   if (config.renaming.enabled) {
@@ -120,7 +133,12 @@ export async function runTaggingAndRename(
     renamed = Boolean(proposed && proposed !== doc.name && !renameDry);
     if (renamed) {
       await ports.renameDocument(doc.id, proposed!);
-      await recordOriginalName(config, ports, doc.id, doc.originalName || doc.name);
+      await setDocumentProperty(
+        ports,
+        config.renaming.originalNameProperty,
+        doc.id,
+        doc.originalName || doc.name,
+      );
     }
     // Recorded even when skipped, and the proposal is stored: `--apply-renames`
     // can then write these through later with no further model call.
@@ -136,27 +154,26 @@ export async function runTaggingAndRename(
     );
   }
 
-  return { applied, proposed, renamed };
+  return { applied, proposed, renamed, country: filedCountry };
 }
 
 /**
- * Preserve the uploaded filename as a Papra custom property when renaming.
- *
- * Papra keeps `original_name` in its own column, but nothing in its UI shows
- * it; a custom property does. The property definition is created on first use.
+ * Write a value into a named Papra custom property, creating the property
+ * definition on first use. Used for the preserved original filename and the
+ * document's country — a custom property shows in Papra's UI where internal
+ * columns do not.
  */
-async function recordOriginalName(
-  config: Config,
+async function setDocumentProperty(
   ports: Ports,
+  propertyName: string,
   docId: string,
-  originalName: string,
+  value: string,
 ): Promise<void> {
-  const propertyName = config.renaming.originalNameProperty;
-  if (!propertyName || !originalName) return;
+  if (!propertyName || !value) return;
   const propertyId =
     ports.customPropertyId(propertyName) ?? (await ports.createCustomProperty(propertyName));
   if (!propertyId) return;
-  await ports.setCustomProperty(docId, propertyId, originalName);
+  await ports.setCustomProperty(docId, propertyId, value);
 }
 
 export interface ProcessResult {
@@ -239,6 +256,7 @@ export async function processDocument(
         `  ${doc.name.slice(0, 44).padEnd(46)} tags=${applied.join(",") || "-"}  name=${catalogue.proposed ?? "-"}`,
       );
       if (config.notify.onTagged && applied.length > 0) lines.push(`tags: ${applied.join(", ")}`);
+      if (config.notify.onTagged && catalogue.country) lines.push(`country: ${catalogue.country}`);
       if (config.notify.onRenamed && catalogue.renamed) {
         lines.push(`renamed: ${doc.name} -> ${catalogue.proposed}`);
       }
@@ -337,9 +355,9 @@ export async function applyPendingRenames(
     try {
       if (!dryRun) {
         await ports.renameDocument(proposal.docId, proposal.to);
-        await recordOriginalName(
-          config,
+        await setDocumentProperty(
           ports,
+          config.renaming.originalNameProperty,
           proposal.docId,
           proposal.originalName || proposal.from,
         );

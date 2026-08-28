@@ -28,6 +28,11 @@ describe("config", () => {
     assert.equal(parsed.notify.onSweep, true);
   });
 
+  it("defaults country_property to off", async () => {
+    const parsed = parseConfig(CONFIG_TOML.replace('country_property = "country"\n', ""));
+    assert.equal(parsed.tagging.countryProperty, "");
+  });
+
   it("rejects a flights handler that cannot enforce the owner rule", async () => {
     assert.throws(
       () =>

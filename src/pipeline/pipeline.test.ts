@@ -47,6 +47,44 @@ describe("pipeline", () => {
     assert.match(ports.notifications[0].message, /renamed: scan_001.pdf ->/);
   });
 
+  it("files the country into a custom property from the same model call", async () => {
+    ports.answers["catalogue"] = { ...catalogueAnswer(["banca"]), country: "Italy" };
+    await run(
+      config((draft) => {
+        draft.flights.enabled = false;
+      }),
+    );
+    assert.ok(ports.createdProperties.includes("country"), "created on first use");
+    assert.deepEqual(
+      ports.setProperties.filter((p) => p.propertyId === "cp-country"),
+      [{ docId: "doc1", propertyId: "cp-country", value: "italy" }],
+      "stored lowercase",
+    );
+    assert.match(ports.notifications[0].message, /country: italy/);
+  });
+
+  it("writes no country when the model returns none or the property is unset", async () => {
+    ports.answers["catalogue"] = { ...catalogueAnswer(["banca"]), country: "" };
+    await run(
+      config((draft) => {
+        draft.flights.enabled = false;
+      }),
+    );
+    ports.answers["catalogue"] = { ...catalogueAnswer(["banca"]), country: "italy" };
+    await run(
+      config((draft) => {
+        draft.flights.enabled = false;
+        draft.tagging.countryProperty = "";
+        draft.tagging.promptVersion = "2";
+        draft.renaming.promptVersion = "2";
+      }),
+    );
+    assert.deepEqual(
+      ports.createdProperties.filter((name) => name === "country"),
+      [],
+    );
+  });
+
   it("includes filed flights in the same single push", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["viaggi"]);
     ports.answers["flights"] = { flights: [segment()] };
@@ -140,12 +178,13 @@ describe("pipeline", () => {
   });
 
   it("changes nothing and persists nothing on a dry run", async () => {
-    ports.answers["catalogue"] = catalogueAnswer(["viaggi"]);
+    ports.answers["catalogue"] = { ...catalogueAnswer(["viaggi"]), country: "china" };
     ports.answers["flights"] = { flights: [segment()] };
     await run(config(), document(), { dryRun: true });
     assert.equal(ports.appliedTags.length, 0);
     assert.equal(ports.renames.length, 0);
     assert.equal(ports.savedFlights.length, 0);
+    assert.equal(ports.setProperties.length, 0, "no property writes on a dry run");
     assert.equal(
       await state.stageRow("doc1", "tagging"),
       null,
