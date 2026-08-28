@@ -106,7 +106,9 @@ AUTO_TAGGING_ENABLED: "false"
 ### Existing documents (backfill)
 
 Sweeps are idempotent — already-processed documents cost nothing — so backfill
-in batches and repeat the same command freely.
+in batches and repeat the same command freely. `--limit N` counts documents
+that still need work: settled documents are skipped past without consuming the
+budget, so repeating `--once --limit 50` advances the backlog by 50 each run.
 
 ```bash
 # 1. Set spend = true in config.toml (see Spending).
@@ -167,6 +169,8 @@ backfill is done.
 | `--doc <id> [--dry-run] [--force]`         | one per document          |
 | `--apply-renames [--limit N] [--dry-run]`  | **none**                  |
 
+- `--limit N` bounds documents that actually need work; settled documents do
+  not count against it.
 - `--force` re-runs stages already recorded done.
 - `--apply-renames` writes rename proposals stored by earlier runs, so names
   already decided are never paid for twice.

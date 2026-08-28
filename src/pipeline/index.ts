@@ -157,6 +157,8 @@ async function recordOriginalName(
   await ports.setCustomProperty(docId, propertyId, originalName);
 }
 
+/** Returns true when the document needed work (a model call was made or
+ * attempted) — which is what `--limit` counts: settled documents are free. */
 export async function processDocument(
   config: Config,
   state: State,
@@ -164,27 +166,27 @@ export async function processDocument(
   docId: string,
   doc: Document | null,
   options: RunOptions = {},
-): Promise<void> {
+): Promise<boolean> {
   const dryRun = options.dryRun ?? false;
   const force = options.force ?? false;
 
   if (doc === null) {
     ports.log(`  ${docId}: not found or deleted`);
-    return;
+    return false;
   }
   if (!config.model.spend) {
     // Skipped, not failed: recording an error here would burn one of the
     // document's `max_attempts` for every delivery received while spending is
     // off, and park it for good before it was ever tried.
     ports.log(`  ${doc.name.slice(0, 50)}: [model] spend is false, leaving untouched`);
-    return;
+    return false;
   }
   if (!doc.content.trim()) {
     // Nothing recorded: the model only ever reads the extracted text, so there
     // is nothing to classify. If Papra extracts text later, its
     // document:updated webhook processes the document then.
     ports.log(`  ${doc.name.slice(0, 50)}: no extracted content, skipping`);
-    return;
+    return false;
   }
   if (!dryRun) await state.recordDocument(doc.id, doc.content, doc.originalName);
 
@@ -229,20 +231,20 @@ export async function processDocument(
           "high",
         );
       }
-      return;
+      return true;
     }
   }
 
   // Second model call only for documents the tags say are travel. This gate is
   // the cost control: everything else stops here having used exactly one call.
-  if (!config.flights.enabled) return;
+  if (!config.flights.enabled) return needsCatalogue;
   const wanted = new Set(config.flights.tags.map((tag) => tag.toLowerCase()));
-  if (!applied.some((tag) => wanted.has(tag.toLowerCase()))) return;
+  if (!applied.some((tag) => wanted.has(tag.toLowerCase()))) return needsCatalogue;
   if (
     !force &&
     !(await state.stageNeedsRun(doc.id, "flights", config.flights.promptVersion, maxAttempts))
   ) {
-    return;
+    return needsCatalogue;
   }
 
   const flightsDry = dryRun || config.flights.dryRun;
@@ -270,7 +272,7 @@ export async function processDocument(
       await ports.notify("papra-curator error", `${doc.name}: flights failed: ${message}`, "high");
     }
   }
-  return;
+  return true;
 }
 
 /**

@@ -34,8 +34,8 @@ const USAGE = `papra-curator
 Every mode except --apply-renames calls the model once per document, and needs
 spend = true under [model] in config.toml. --dry-run does NOT make a run free:
 it asks the model and then declines to apply the answer, so it costs one call
-per document just like a real run. --limit bounds how many documents are
-processed.`;
+per document just like a real run. --limit counts documents that still need
+work: settled documents are skipped past for free and do not count.`;
 
 interface Args {
   once: boolean;
@@ -89,18 +89,27 @@ async function reconcile(
   reader: PapraReader,
   options: { dryRun: boolean; force: boolean; limit: number },
 ): Promise<void> {
-  const documents = reader.documents(options.limit);
+  // The limit counts documents that needed work, not documents scanned:
+  // settled documents are free, and a backfill batched with --limit must
+  // advance by that many documents every run.
+  const documents = reader.documents(0);
   ports.log(
     `reconcile: ${documents.length} document(s) in scope` +
-      (options.limit ? ` (limited to ${options.limit})` : "") +
+      (options.limit ? ` (stopping after ${options.limit} needing work)` : "") +
       (options.dryRun ? " — dry run" : ""),
   );
+  let worked = 0;
   for (const doc of documents) {
+    if (options.limit > 0 && worked >= options.limit) break;
     try {
-      await processDocument(config, state, ports, doc.id, doc, {
-        dryRun: options.dryRun,
-        force: options.force,
-      });
+      if (
+        await processDocument(config, state, ports, doc.id, doc, {
+          dryRun: options.dryRun,
+          force: options.force,
+        })
+      ) {
+        worked++;
+      }
     } catch (error) {
       // processDocument records and notifies its own stage failures; what lands
       // here is a read that died before any stage ran (e.g. Papra's DB still
@@ -179,8 +188,9 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       ports.log("[model] spend is false: documents will be received and skipped, not processed");
     }
     await serve(config, ports, env.webhookSecret, {
-      processDocument: (docId) =>
-        processDocument(config, state, ports, docId, reader.document(docId)),
+      processDocument: async (docId) => {
+        await processDocument(config, state, ports, docId, reader.document(docId));
+      },
       reconcile: () =>
         reconcile(config, state, ports, reader, { dryRun: false, force: false, limit: 0 }),
     });

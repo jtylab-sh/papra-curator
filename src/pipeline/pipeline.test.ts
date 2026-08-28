@@ -144,6 +144,17 @@ describe("pipeline", () => {
     assert.deepEqual(ports.modelCalls, ["catalogue"], "already-done work must not be repeated");
   });
 
+  it("reports whether the document needed work, which is what --limit counts", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    assert.equal(await run(config()), true, "a fresh document needs work");
+    assert.equal(await run(config()), false, "a settled document must not count");
+    assert.equal(
+      await run(config(), document({ id: "doc2", content: "  " })),
+      false,
+      "no content, no work",
+    );
+  });
+
   it("reprocesses when the prompt version is bumped", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"]);
     await run(config());
