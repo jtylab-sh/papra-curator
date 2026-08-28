@@ -38,6 +38,19 @@ describe("stage tracking", () => {
     assert.ok(!(await state.stageNeedsRun("doc1", "renaming", "1", 3)));
   });
 
+  it("re-queues every stage when the document's content changes", async () => {
+    assert.equal(await state.recordDocument("doc1", "first text", "a.pdf"), false);
+    await state.setStage("doc1", "tagging", "done", "1");
+    assert.equal(
+      await state.recordDocument("doc1", "first text", "a.pdf"),
+      false,
+      "same content is settled",
+    );
+    assert.equal((await state.stageRow("doc1", "tagging"))?.status, "done");
+    assert.equal(await state.recordDocument("doc1", "second text", "a.pdf"), true);
+    assert.equal(await state.stageRow("doc1", "tagging"), null, "stale stages must be gone");
+  });
+
   it("opens a file DB in WAL mode and takes a second writer without locking", async () => {
     // The serve container and a one-shot --once run write this file at the
     // same time (a sweep rename triggers a webhook back into serve).

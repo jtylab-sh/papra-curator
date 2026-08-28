@@ -57,16 +57,25 @@ export class State {
     await this.prisma.$disconnect();
   }
 
-  async recordDocument(docId: string, content: string, originalName: string): Promise<void> {
+  /**
+   * Record a document sighting. Returns true when the extracted text changed
+   * since the stages last ran (late OCR after an early webhook, a content
+   * repair through the API): every stored stage was decided on the old text,
+   * so they are all deleted and the caller's stage checks re-run them.
+   */
+  async recordDocument(docId: string, content: string, originalName: string): Promise<boolean> {
     const contentSha256 = createHash("sha256")
       .update(content ?? "")
       .digest("hex");
-    // Insert-or-ignore: the first sighting is the one worth keeping.
-    await this.prisma.document.upsert({
-      where: { docId },
-      create: { docId, contentSha256, originalName },
-      update: {},
-    });
+    const existing = await this.prisma.document.findUnique({ where: { docId } });
+    if (existing === null) {
+      await this.prisma.document.create({ data: { docId, contentSha256, originalName } });
+      return false;
+    }
+    if (existing.contentSha256 === contentSha256) return false;
+    await this.prisma.document.update({ where: { docId }, data: { contentSha256 } });
+    await this.prisma.stage.deleteMany({ where: { docId } });
+    return true;
   }
 
   async stageRow(docId: string, stage: Stage): Promise<StageRow | null> {

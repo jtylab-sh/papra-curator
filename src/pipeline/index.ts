@@ -207,7 +207,9 @@ export async function processDocument(
     ports.log(`  ${doc.name.slice(0, 50)}: no extracted content, skipping`);
     return result;
   }
-  if (!dryRun) await state.recordDocument(doc.id, doc.content, doc.originalName);
+  if (!dryRun && (await state.recordDocument(doc.id, doc.content, doc.originalName))) {
+    ports.log(`  ${doc.name.slice(0, 50)}: content changed since last run, stages re-queued`);
+  }
 
   const maxAttempts = config.model.maxAttempts;
   const catalogueStages: Stage[] = [];

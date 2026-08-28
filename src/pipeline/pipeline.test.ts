@@ -173,6 +173,17 @@ describe("pipeline", () => {
     );
   });
 
+  it("reprocesses a document whose extracted text changed", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    await run(config());
+    await run(config(), document({ content: "corrected OCR text" }));
+    assert.deepEqual(
+      ports.modelCalls,
+      ["catalogue", "catalogue"],
+      "new text means the old decision is stale",
+    );
+  });
+
   it("reprocesses when the prompt version is bumped", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"]);
     await run(config());

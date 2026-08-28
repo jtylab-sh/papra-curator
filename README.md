@@ -105,6 +105,10 @@ AUTO_TAGGING_ENABLED: "false"
 
 ### Existing documents (backfill)
 
+A document whose extracted text later changes (late OCR, a content repair
+through Papra's API) is detected by content hash and re-runs every stage on
+the next webhook or sweep. Re-runs only ever ADD tags, never remove them.
+
 Sweeps are idempotent — already-processed documents cost nothing — so backfill
 in batches and repeat the same command freely. `--limit N` counts documents
 that still need work: settled documents are skipped past without consuming the
