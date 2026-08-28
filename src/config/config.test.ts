@@ -25,6 +25,7 @@ describe("config", () => {
     assert.equal(parsed.notify.onRenamed, false);
     assert.equal(parsed.notify.onFlights, true);
     assert.equal(parsed.notify.onError, true);
+    assert.equal(parsed.notify.onSweep, true);
   });
 
   it("rejects a flights handler that cannot enforce the owner rule", async () => {

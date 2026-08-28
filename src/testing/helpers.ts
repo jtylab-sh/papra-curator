@@ -87,7 +87,7 @@ export class FakePorts implements Ports {
   createdProperties: string[] = [];
   setProperties: { docId: string; propertyId: string; value: string }[] = [];
   savedFlights: unknown[] = [];
-  notifications: { title: string; priority: string }[] = [];
+  notifications: { title: string; message: string; priority: string }[] = [];
   logs: string[] = [];
 
   tags: Tag[] = [
@@ -140,8 +140,8 @@ export class FakePorts implements Ports {
   async saveFlight(body: unknown): Promise<void> {
     this.savedFlights.push(body);
   }
-  async notify(title: string, _message: string, priority = "default"): Promise<void> {
-    this.notifications.push({ title, priority });
+  async notify(title: string, message: string, priority = "default"): Promise<void> {
+    this.notifications.push({ title, message, priority });
   }
   log(message: string): void {
     this.logs.push(message);

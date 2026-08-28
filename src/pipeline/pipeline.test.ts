@@ -34,17 +34,32 @@ describe("pipeline", () => {
     );
   });
 
-  it("notifies tagging and renaming when their switches are on", async () => {
+  it("merges tagging and renaming into one push per document", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"]);
     await run(
       config((draft) => {
         draft.flights.enabled = false;
       }),
     );
-    assert.deepEqual(
-      ports.notifications.map((n) => n.title),
-      ["Tagged scan_001.pdf", "Renamed"],
-    );
+    assert.equal(ports.notifications.length, 1, "one push per document, not one per action");
+    assert.equal(ports.notifications[0].title, "2024-10-26_air-china_carta-imbarco.pdf");
+    assert.match(ports.notifications[0].message, /tags: banca/);
+    assert.match(ports.notifications[0].message, /renamed: scan_001.pdf ->/);
+  });
+
+  it("includes filed flights in the same single push", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["viaggi"]);
+    ports.answers["flights"] = { flights: [segment()] };
+    await run(config());
+    assert.equal(ports.notifications.length, 1);
+    assert.match(ports.notifications[0].message, /tags: viaggi/);
+    assert.match(ports.notifications[0].message, /flights: /);
+  });
+
+  it("stays silent per document when quiet — sweeps summarize instead", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    await run(config(), document(), { quiet: true });
+    assert.deepEqual(ports.notifications, []);
   });
 
   it("sends nothing when every notification switch is off", async () => {
@@ -65,7 +80,10 @@ describe("pipeline", () => {
   it("notifies a failed stage with high priority when on_error is set", async () => {
     ports.failOn["catalogue"] = "429 rate limited";
     await run(config());
-    assert.deepEqual(ports.notifications, [{ title: "papra-curator error", priority: "high" }]);
+    assert.deepEqual(
+      ports.notifications.map((n) => ({ title: n.title, priority: n.priority })),
+      [{ title: "papra-curator error", priority: "high" }],
+    );
   });
 
   it("costs exactly one model call for a non-travel document", async () => {
@@ -146,10 +164,10 @@ describe("pipeline", () => {
 
   it("reports whether the document needed work, which is what --limit counts", async () => {
     ports.answers["catalogue"] = catalogueAnswer(["banca"]);
-    assert.equal(await run(config()), true, "a fresh document needs work");
-    assert.equal(await run(config()), false, "a settled document must not count");
+    assert.equal((await run(config())).worked, true, "a fresh document needs work");
+    assert.equal((await run(config())).worked, false, "a settled document must not count");
     assert.equal(
-      await run(config(), document({ id: "doc2", content: "  " })),
+      (await run(config(), document({ id: "doc2", content: "  " }))).worked,
       false,
       "no content, no work",
     );

@@ -71,6 +71,7 @@ export interface Config {
     onRenamed: boolean;
     onFlights: boolean;
     onError: boolean;
+    onSweep: boolean;
   };
 }
 
@@ -211,6 +212,9 @@ export function parseConfig(text: string): Config {
       onRenamed: bool(notify, "on_renamed", "notify", false),
       onFlights: bool(notify, "on_flights", "notify", true),
       onError: bool(notify, "on_error", "notify", true),
+      // One push summarizing a sweep that did anything; sweeps suppress the
+      // per-document pushes, so a backfill is one message, not hundreds.
+      onSweep: bool(notify, "on_sweep", "notify", true),
     },
   };
 

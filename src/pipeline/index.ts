@@ -24,6 +24,8 @@ export const UNTAGGED = "untagged";
 export interface RunOptions {
   dryRun?: boolean;
   force?: boolean;
+  /** Suppress the per-document push; sweeps set this and send one summary instead. */
+  quiet?: boolean;
 }
 
 export interface CatalogueResult {
@@ -157,8 +159,16 @@ async function recordOriginalName(
   await ports.setCustomProperty(docId, propertyId, originalName);
 }
 
-/** Returns true when the document needed work (a model call was made or
- * attempted) — which is what `--limit` counts: settled documents are free. */
+export interface ProcessResult {
+  /** True when the document needed work (a model call was made or attempted) — what `--limit` counts. */
+  worked: boolean;
+  tags: string[];
+  renamed: boolean;
+  proposed: string | null;
+  flights: number;
+  errors: number;
+}
+
 export async function processDocument(
   config: Config,
   state: State,
@@ -166,27 +176,36 @@ export async function processDocument(
   docId: string,
   doc: Document | null,
   options: RunOptions = {},
-): Promise<boolean> {
+): Promise<ProcessResult> {
   const dryRun = options.dryRun ?? false;
   const force = options.force ?? false;
+  const quiet = options.quiet ?? false;
+  const result: ProcessResult = {
+    worked: false,
+    tags: [],
+    renamed: false,
+    proposed: null,
+    flights: 0,
+    errors: 0,
+  };
 
   if (doc === null) {
     ports.log(`  ${docId}: not found or deleted`);
-    return false;
+    return result;
   }
   if (!config.model.spend) {
     // Skipped, not failed: recording an error here would burn one of the
     // document's `max_attempts` for every delivery received while spending is
     // off, and park it for good before it was ever tried.
     ports.log(`  ${doc.name.slice(0, 50)}: [model] spend is false, leaving untouched`);
-    return false;
+    return result;
   }
   if (!doc.content.trim()) {
     // Nothing recorded: the model only ever reads the extracted text, so there
     // is nothing to classify. If Papra extracts text later, its
     // document:updated webhook processes the document then.
     ports.log(`  ${doc.name.slice(0, 50)}: no extracted content, skipping`);
-    return false;
+    return result;
   }
   if (!dryRun) await state.recordDocument(doc.id, doc.content, doc.originalName);
 
@@ -200,20 +219,26 @@ export async function processDocument(
     ),
   );
   const needsCatalogue = force || staleStages.some(Boolean);
+  result.worked = needsCatalogue;
+
+  // At most ONE push per document, assembled from everything done to it; the
+  // on_* switches choose which lines appear in it, not separate messages.
+  const lines: string[] = [];
 
   let applied = ports.documentTags(doc.id);
   if (needsCatalogue) {
     try {
-      const result = await runTaggingAndRename(config, state, ports, doc, options);
-      applied = result.applied;
+      const catalogue = await runTaggingAndRename(config, state, ports, doc, options);
+      applied = catalogue.applied;
+      result.tags = catalogue.applied;
+      result.renamed = catalogue.renamed;
+      result.proposed = catalogue.proposed;
       ports.log(
-        `  ${doc.name.slice(0, 44).padEnd(46)} tags=${applied.join(",") || "-"}  name=${result.proposed ?? "-"}`,
+        `  ${doc.name.slice(0, 44).padEnd(46)} tags=${applied.join(",") || "-"}  name=${catalogue.proposed ?? "-"}`,
       );
-      if (!dryRun && config.notify.onTagged && applied.length > 0) {
-        await ports.notify(`Tagged ${doc.name.slice(0, 60)}`, applied.join(", "));
-      }
-      if (config.notify.onRenamed && result.renamed) {
-        await ports.notify("Renamed", `${doc.name} -> ${result.proposed}`);
+      if (config.notify.onTagged && applied.length > 0) lines.push(`tags: ${applied.join(", ")}`);
+      if (config.notify.onRenamed && catalogue.renamed) {
+        lines.push(`renamed: ${doc.name} -> ${catalogue.proposed}`);
       }
     } catch (error) {
       const message = String((error as Error).message ?? error).slice(0, 400);
@@ -224,6 +249,7 @@ export async function processDocument(
         });
       }
       ports.log(`  ! ${doc.name.slice(0, 44)}: catalogue failed: ${message}`);
+      result.errors += 1;
       if (config.notify.onError) {
         await ports.notify(
           "papra-curator error",
@@ -231,48 +257,58 @@ export async function processDocument(
           "high",
         );
       }
-      return true;
+      return result;
     }
   }
 
   // Second model call only for documents the tags say are travel. This gate is
   // the cost control: everything else stops here having used exactly one call.
-  if (!config.flights.enabled) return needsCatalogue;
-  const wanted = new Set(config.flights.tags.map((tag) => tag.toLowerCase()));
-  if (!applied.some((tag) => wanted.has(tag.toLowerCase()))) return needsCatalogue;
-  if (
-    !force &&
-    !(await state.stageNeedsRun(doc.id, "flights", config.flights.promptVersion, maxAttempts))
-  ) {
-    return needsCatalogue;
-  }
-
-  const flightsDry = dryRun || config.flights.dryRun;
-  try {
-    const added = await handleFlights(config, ports, doc, flightsDry);
-    await state.setStage(doc.id, "flights", "done", config.flights.promptVersion, {
-      result: { added },
-      dryRun,
-    });
-    if (added.length > 0) {
-      ports.log(`    flights: ${added.join(", ")}`);
-      // A dry run files nothing, so it has nothing to announce.
-      if (config.notify.onFlights && !flightsDry) {
-        await ports.notify(`AirTrail: ${added.length} flight(s)`, added.join("\n"));
+  if (config.flights.enabled) {
+    const wanted = new Set(config.flights.tags.map((tag) => tag.toLowerCase()));
+    const isTravel = applied.some((tag) => wanted.has(tag.toLowerCase()));
+    if (
+      isTravel &&
+      (force ||
+        (await state.stageNeedsRun(doc.id, "flights", config.flights.promptVersion, maxAttempts)))
+    ) {
+      result.worked = true;
+      const flightsDry = dryRun || config.flights.dryRun;
+      try {
+        const added = await handleFlights(config, ports, doc, flightsDry);
+        await state.setStage(doc.id, "flights", "done", config.flights.promptVersion, {
+          result: { added },
+          dryRun,
+        });
+        result.flights = added.length;
+        if (added.length > 0) {
+          ports.log(`    flights: ${added.join(", ")}`);
+          // A dry run files nothing, so it has nothing to announce.
+          if (config.notify.onFlights && !flightsDry) lines.push(`flights: ${added.join(", ")}`);
+        }
+      } catch (error) {
+        const message = String((error as Error).message ?? error).slice(0, 400);
+        await state.setStage(doc.id, "flights", "error", config.flights.promptVersion, {
+          error: message,
+          dryRun,
+        });
+        ports.log(`  ! ${doc.name.slice(0, 44)}: flights failed: ${message}`);
+        result.errors += 1;
+        if (config.notify.onError) {
+          await ports.notify(
+            "papra-curator error",
+            `${doc.name}: flights failed: ${message}`,
+            "high",
+          );
+        }
       }
     }
-  } catch (error) {
-    const message = String((error as Error).message ?? error).slice(0, 400);
-    await state.setStage(doc.id, "flights", "error", config.flights.promptVersion, {
-      error: message,
-      dryRun,
-    });
-    ports.log(`  ! ${doc.name.slice(0, 44)}: flights failed: ${message}`);
-    if (config.notify.onError) {
-      await ports.notify("papra-curator error", `${doc.name}: flights failed: ${message}`, "high");
-    }
   }
-  return true;
+
+  if (!dryRun && !quiet && lines.length > 0) {
+    const title = result.renamed && result.proposed ? result.proposed : doc.name;
+    await ports.notify(title.slice(0, 60), lines.join("\n"));
+  }
+  return result;
 }
 
 /**

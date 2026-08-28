@@ -82,11 +82,11 @@ function requireSecrets(config: Config, needsModel: boolean): void {
   }
 }
 
-async function reconcile(
+export async function reconcile(
   config: Config,
   state: State,
   ports: Ports,
-  reader: PapraReader,
+  reader: Pick<PapraReader, "documents">,
   options: { dryRun: boolean; force: boolean; limit: number },
 ): Promise<void> {
   // The limit counts documents that needed work, not documents scanned:
@@ -98,25 +98,38 @@ async function reconcile(
       (options.limit ? ` (stopping after ${options.limit} needing work)` : "") +
       (options.dryRun ? " — dry run" : ""),
   );
-  let worked = 0;
+  const totals = { worked: 0, tagged: 0, renamed: 0, flights: 0, errors: 0 };
   for (const doc of documents) {
-    if (options.limit > 0 && worked >= options.limit) break;
+    if (options.limit > 0 && totals.worked >= options.limit) break;
     try {
-      if (
-        await processDocument(config, state, ports, doc.id, doc, {
-          dryRun: options.dryRun,
-          force: options.force,
-        })
-      ) {
-        worked++;
-      }
+      const result = await processDocument(config, state, ports, doc.id, doc, {
+        dryRun: options.dryRun,
+        force: options.force,
+        quiet: true,
+      });
+      if (result.worked) totals.worked++;
+      if (result.tags.length > 0) totals.tagged++;
+      if (result.renamed) totals.renamed++;
+      totals.flights += result.flights;
+      totals.errors += result.errors;
     } catch (error) {
       // processDocument records and notifies its own stage failures; what lands
       // here is a read that died before any stage ran (e.g. Papra's DB still
       // locked after the busy timeout). One such document must not abort the
       // rest of the sweep — the next sweep picks it up again.
+      totals.errors++;
       ports.log(`  ! ${doc.name.slice(0, 44)}: ${String((error as Error).message).slice(0, 200)}`);
     }
+  }
+  // One push for the whole sweep instead of one per document, and none at all
+  // when the sweep found nothing to do — a periodic sweep over a settled
+  // archive stays silent.
+  if (!options.dryRun && config.notify.onSweep && totals.worked > 0) {
+    await ports.notify(
+      "papra-curator sweep",
+      `${totals.worked} processed: ${totals.tagged} tagged, ${totals.renamed} renamed, ` +
+        `${totals.flights} flight(s), ${totals.errors} error(s)`,
+    );
   }
 }
 

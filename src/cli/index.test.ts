@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, it } from "node:test";
 
-import { parseArgs } from "#~/cli/index.ts";
+import { parseArgs, reconcile } from "#~/cli/index.ts";
+import { State, createSchema } from "#~/state/index.ts";
+import { FakePorts, catalogueAnswer, config, document } from "#~/testing/helpers.ts";
 
 describe("cli", () => {
   it("has no default action", async () => {
@@ -18,6 +20,37 @@ describe("cli", () => {
     assert.equal(parseArgs(["--once", "--limit", "5"]).limit, 5);
     assert.throws(() => parseArgs(["--limit", "0"]), /positive integer/);
     assert.throws(() => parseArgs(["--limit", "all"]), /positive integer/);
+  });
+});
+
+describe("reconcile", () => {
+  it("stops after --limit documents needing work and pushes one sweep summary", async () => {
+    const state = await State.open("file::memory:");
+    await createSchema(state);
+    const ports = new FakePorts();
+    ports.answers["catalogue"] = catalogueAnswer(["banca"]);
+    const cfg = config((draft) => {
+      draft.flights.enabled = false;
+    });
+    // d1 is already settled; d2 and d3 both need work but the limit is 1.
+    await state.setStage("d1", "tagging", "done", "1");
+    await state.setStage("d1", "renaming", "done", "1");
+    const docs = [document({ id: "d1" }), document({ id: "d2" }), document({ id: "d3" })];
+    await reconcile(
+      cfg,
+      state,
+      ports,
+      { documents: () => docs },
+      { dryRun: false, force: false, limit: 1 },
+    );
+    assert.deepEqual(ports.modelCalls, ["catalogue"], "d1 is free, d2 counts, d3 never reached");
+    assert.deepEqual(
+      ports.notifications.map((n) => n.title),
+      ["papra-curator sweep"],
+      "per-document pushes are suppressed in a sweep",
+    );
+    assert.match(ports.notifications[0].message, /1 processed: 1 tagged, 1 renamed/);
+    await state.close();
   });
 });
 

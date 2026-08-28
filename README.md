@@ -227,10 +227,16 @@ sources.
 | `[handlers.flights] near_duplicate_days` | `2`                  | same flight number within ± this many days is skipped for review        |
 | `[handlers.flights] dry_run`             | `false`              | extract and log, but do not push to AirTrail                            |
 | `[notify] url` / `[notify] topic`        | `""`                 | ntfy server/topic; empty topic disables all notifications               |
-| `[notify] on_tagged`                     | `false`              | push when a document's tags were applied                                |
-| `[notify] on_renamed`                    | `false`              | push when a document was renamed (incl. `--apply-renames`)              |
-| `[notify] on_flights`                    | `true`               | push when flights were filed                                            |
+| `[notify] on_tagged`                     | `false`              | include applied tags in the document's push                             |
+| `[notify] on_renamed`                    | `false`              | include the rename in the document's push (incl. `--apply-renames`)     |
+| `[notify] on_flights`                    | `true`               | include filed flights in the document's push                            |
 | `[notify] on_error`                      | `true`               | push when a stage or sweep fails (high priority)                        |
+| `[notify] on_sweep`                      | `true`               | one summary push per sweep that did anything                            |
+
+A processed document sends at most **one** push, listing everything done to it;
+the `on_*` switches choose which lines appear, not separate messages. Sweeps
+(`--once` and the periodic reconcile) suppress the per-document pushes and send
+one summary instead.
 
 ## Spending
 
