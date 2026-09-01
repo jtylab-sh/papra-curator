@@ -129,11 +129,14 @@ export async function runTaggingAndRename(
   // A shape check alone is not enough: the model has produced days that do not
   // exist (a Nov 31), which Papra rejects with a 400 that fails the whole stage.
   const answerDate = String(answer?.date ?? "").trim();
+  // A future day is never an issue date either — despite the prompt, the model
+  // keeps filing expiry dates it finds on identity cards (MRZ lines especially).
   const parsedDate = new Date(answerDate);
   const isRealDate =
     /^\d{4}-\d{2}-\d{2}$/.test(answerDate) &&
     !Number.isNaN(parsedDate.getTime()) &&
-    parsedDate.toISOString().slice(0, 10) === answerDate;
+    parsedDate.toISOString().slice(0, 10) === answerDate &&
+    answerDate <= new Date().toISOString().slice(0, 10);
   let filedDate: string | null = null;
   if (config.tagging.setDocumentDate && isRealDate && !dryRun) {
     await ports.setDocumentDate(doc.id, answerDate);
