@@ -80,8 +80,13 @@ export function cataloguePrompt(
       "whole name should stay well under 80 characters.",
     "- date: the date the document was ISSUED, written or emitted, as " +
       "YYYY-MM-DD. Not other dates it mentions: not travel dates, due dates, " +
-      "billing periods or future events — a boarding pass issued in March for a " +
-      "July flight is dated March. Use YYYY-MM or YYYY if that is all the " +
+      "billing periods, expiry dates or future events — a boarding pass issued " +
+      "in March for a July flight is dated March, and an identity document " +
+      "(ID card, passport, driving licence, permit) is dated the day it was " +
+      "issued or released, never the day it expires or stops being valid — " +
+      "if the only date on it is an expiry, the document is undated. " +
+      "Numeric dates on Italian and other European documents are DD/MM/YYYY. " +
+      "Use YYYY-MM or YYYY if that is all the " +
       "document supports. Empty string if genuinely undated. Never today's date.",
     `- Today is ${today}. Use it only to resolve ambiguous or relative dates: ` +
       "it is the day the document is being processed, not the day it was " +
