@@ -126,9 +126,16 @@ export async function runTaggingAndRename(
   // The issue date goes into Papra's native document date field, which its UI
   // shows and sorts by. Only a full date is written: Papra stores a timestamp,
   // so a bare year or month would fabricate a precision the document lacks.
+  // A shape check alone is not enough: the model has produced days that do not
+  // exist (a Nov 31), which Papra rejects with a 400 that fails the whole stage.
   const answerDate = String(answer?.date ?? "").trim();
+  const parsedDate = new Date(answerDate);
+  const isRealDate =
+    /^\d{4}-\d{2}-\d{2}$/.test(answerDate) &&
+    !Number.isNaN(parsedDate.getTime()) &&
+    parsedDate.toISOString().slice(0, 10) === answerDate;
   let filedDate: string | null = null;
-  if (config.tagging.setDocumentDate && /^\d{4}-\d{2}-\d{2}$/.test(answerDate) && !dryRun) {
+  if (config.tagging.setDocumentDate && isRealDate && !dryRun) {
     await ports.setDocumentDate(doc.id, answerDate);
     filedDate = answerDate;
   }
