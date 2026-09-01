@@ -93,9 +93,13 @@ export function cataloguePrompt(
       "Italian if the document is Italian: 'bolletta luce', 'busta paga', " +
       "'carta imbarco', 'contratto affitto'.",
     "- detail: ONE short distinguishing detail, 3 words max, only when it helps " +
-      "tell near-identical documents apart (a route like 'mxp-tfu', a month, an " +
-      "invoice number). Empty string when nothing adds value — most documents " +
-      "need none.",
+      "tell near-identical documents apart (a route like 'mxp-tfu', a billing " +
+      "period, an invoice number). Empty string when nothing adds value — most " +
+      "documents need none.",
+    "- For recurring periodic documents (payslips, monthly bills, bank " +
+      "statements), detail is ALWAYS the period it covers, written as numbers: " +
+      "YYYY-MM for a monthly document, YYYY for an annual one. Never month " +
+      "names, never a bare month without the year.",
     "",
     "COUNTRY",
     "- country: the single country the document belongs to — where it was " +
