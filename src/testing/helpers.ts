@@ -29,6 +29,7 @@ prompt_version = "1"
 max_tags = 8
 allow_new_tags = false
 country_property = "country"
+set_document_date = true
 
 [renaming]
 enabled = true
@@ -84,6 +85,7 @@ export class FakePorts implements Ports {
   appliedTags: string[] = [];
   createdTags: string[] = [];
   renames: { docId: string; name: string }[] = [];
+  documentDates: { docId: string; date: string }[] = [];
   customPropertyIds: Record<string, string> = {};
   createdProperties: string[] = [];
   setProperties: { docId: string; propertyId: string; value: string }[] = [];
@@ -122,6 +124,9 @@ export class FakePorts implements Ports {
   async renameDocument(docId: string, newName: string): Promise<void> {
     if (this.failOn["rename"]) throw new Error(this.failOn["rename"]);
     this.renames.push({ docId, name: newName });
+  }
+  async setDocumentDate(docId: string, date: string): Promise<void> {
+    this.documentDates.push({ docId, date });
   }
   customPropertyId(name: string): string | null {
     return this.customPropertyIds[name] ?? null;

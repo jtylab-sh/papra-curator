@@ -63,6 +63,36 @@ describe("pipeline", () => {
     assert.match(ports.notifications[0].message, /country: italy/);
   });
 
+  it("files a full issue date into Papra's document date field", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["banca"], { date: "2025-03-12" });
+    await run(
+      config((draft) => {
+        draft.flights.enabled = false;
+      }),
+    );
+    assert.deepEqual(ports.documentDates, [{ docId: "doc1", date: "2025-03-12" }]);
+    assert.match(ports.notifications[0].message, /date: 2025-03-12/);
+  });
+
+  it("writes no document date for partial or missing dates, or when off", async () => {
+    ports.answers["catalogue"] = catalogueAnswer(["banca"], { date: "2025-03" });
+    await run(
+      config((draft) => {
+        draft.flights.enabled = false;
+      }),
+    );
+    ports.answers["catalogue"] = catalogueAnswer(["banca"], { date: "2025-03-12" });
+    await run(
+      config((draft) => {
+        draft.flights.enabled = false;
+        draft.tagging.setDocumentDate = false;
+        draft.tagging.promptVersion = "2";
+        draft.renaming.promptVersion = "2";
+      }),
+    );
+    assert.deepEqual(ports.documentDates, []);
+  });
+
   it("writes no country when the model returns none or the property is unset", async () => {
     ports.answers["catalogue"] = { ...catalogueAnswer(["banca"]), country: "" };
     await run(
@@ -185,6 +215,7 @@ describe("pipeline", () => {
     assert.equal(ports.renames.length, 0);
     assert.equal(ports.savedFlights.length, 0);
     assert.equal(ports.setProperties.length, 0, "no property writes on a dry run");
+    assert.equal(ports.documentDates.length, 0, "no document date on a dry run");
     assert.equal(
       await state.stageRow("doc1", "tagging"),
       null,

@@ -201,6 +201,16 @@ export class PapraWriter {
     );
   }
 
+  /** Papra's native document date (the UI's "Date" field); ISO YYYY-MM-DD in, epoch ms stored. */
+  async setDocumentDate(docId: string, isoDate: string): Promise<void> {
+    await requestJson(`${papraBase(this.config)}/documents/${docId}`, {
+      payload: { documentDate: isoDate },
+      token: this.apiKey,
+      method: "PATCH",
+      timeoutMs: 60_000,
+    });
+  }
+
   /**
    * Only `name` changes. Papra keeps the uploaded filename in its own
    * `original_name` column, which updateDocument never touches, so a rename is

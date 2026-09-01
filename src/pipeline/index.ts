@@ -33,6 +33,8 @@ export interface CatalogueResult {
   proposed: string | null;
   /** Country filed into the configured custom property, or null when none was written. */
   country: string | null;
+  /** Issue date written into Papra's document date field, or null when none was. */
+  date: string | null;
   /** True when the rename was actually sent to Papra, not proposed or dry-run. */
   renamed: boolean;
 }
@@ -121,6 +123,16 @@ export async function runTaggingAndRename(
     filedCountry = country;
   }
 
+  // The issue date goes into Papra's native document date field, which its UI
+  // shows and sorts by. Only a full date is written: Papra stores a timestamp,
+  // so a bare year or month would fabricate a precision the document lacks.
+  const answerDate = String(answer?.date ?? "").trim();
+  let filedDate: string | null = null;
+  if (config.tagging.setDocumentDate && /^\d{4}-\d{2}-\d{2}$/.test(answerDate) && !dryRun) {
+    await ports.setDocumentDate(doc.id, answerDate);
+    filedDate = answerDate;
+  }
+
   let proposed: string | null = null;
   let renamed = false;
   if (config.renaming.enabled) {
@@ -154,7 +166,7 @@ export async function runTaggingAndRename(
     );
   }
 
-  return { applied, proposed, renamed, country: filedCountry };
+  return { applied, proposed, renamed, country: filedCountry, date: filedDate };
 }
 
 /**
@@ -257,6 +269,7 @@ export async function processDocument(
       );
       if (config.notify.onTagged && applied.length > 0) lines.push(`tags: ${applied.join(", ")}`);
       if (config.notify.onTagged && catalogue.country) lines.push(`country: ${catalogue.country}`);
+      if (config.notify.onTagged && catalogue.date) lines.push(`date: ${catalogue.date}`);
       if (config.notify.onRenamed && catalogue.renamed) {
         lines.push(`renamed: ${doc.name} -> ${catalogue.proposed}`);
       }

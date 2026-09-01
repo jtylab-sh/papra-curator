@@ -45,6 +45,7 @@ export interface Config {
     maxTags: number;
     allowNewTags: boolean;
     countryProperty: string;
+    setDocumentDate: boolean;
   };
   renaming: {
     enabled: boolean;
@@ -183,6 +184,9 @@ export function parseConfig(text: string): Config {
       // Papra text custom property to fill with the document's country
       // (created on first use); empty disables.
       countryProperty: str(tagging, "country_property", "tagging", ""),
+      // File the catalogue's issue date into Papra's native document date
+      // field (the UI's "Date"); only full YYYY-MM-DD dates are written.
+      setDocumentDate: bool(tagging, "set_document_date", "tagging", false),
     },
     renaming: {
       enabled: bool(renaming, "enabled", "renaming", true),

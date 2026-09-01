@@ -29,6 +29,7 @@ export interface Ports {
   applyTag(docId: string, tagId: string): Promise<void>;
   createTag(name: string, description?: string): Promise<string | null>;
   renameDocument(docId: string, newName: string): Promise<void>;
+  setDocumentDate(docId: string, isoDate: string): Promise<void>;
 
   customPropertyId(name: string): string | null;
   createCustomProperty(name: string): Promise<string | null>;
@@ -101,6 +102,7 @@ export function createPorts(
     applyTag: (docId, tagId) => writer.applyTag(docId, tagId),
     createTag: (name, description) => writer.createTag(name, description),
     renameDocument: (docId, newName) => writer.renameDocument(docId, newName),
+    setDocumentDate: (docId, isoDate) => writer.setDocumentDate(docId, isoDate),
     customPropertyId: (name) => reader.customPropertyId(name),
     createCustomProperty: (name) => writer.createCustomProperty(name),
     setCustomProperty: (docId, propertyId, value) =>

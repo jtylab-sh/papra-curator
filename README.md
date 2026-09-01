@@ -216,6 +216,7 @@ sources.
 | `[tagging] max_tags`                     | `8`                  | most tags applied per document                                                                      |
 | `[tagging] allow_new_tags`               | `false`              | let the model create tags (else vocabulary enforced in the schema)                                  |
 | `[tagging] country_property`             | `""`                 | Papra text custom property filled with the document's country (created on first use); `""` disables |
+| `[tagging] set_document_date`            | `false`              | file the issue date into Papra's native document date field (full YYYY-MM-DD only)                  |
 | `[renaming] enabled`                     | `true`               | rename documents                                                                                    |
 | `[renaming] prompt_version`              | — (required)         | bump to re-decide every name on the next sweep                                                      |
 | `[renaming] template`                    | — (required)         | e.g. `"{date}_{party}_{doctype}_{detail}"`; empty fields collapse                                   |
