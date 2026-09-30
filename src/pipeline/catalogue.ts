@@ -105,6 +105,11 @@ export function cataloguePrompt(
       "statements), detail is ALWAYS the period it covers, written as numbers: " +
       "YYYY-MM for a monthly document, YYYY for an annual one. Never month " +
       "names, never a bare month without the year.",
+    "- For a medical prescription (ricetta, impegnativa), doctype is 'ricetta' " +
+      "and detail is ALWAYS what it prescribes, the visit, exam or medicine: " +
+      "'visita neurologica', 'rx torace', 'amoxicillina'. If it prescribes " +
+      "several, use the first. Party is 'ssn' for any national or regional " +
+      "health service prescription (SSN, SSR, Regione Lombardia).",
     "",
     "COUNTRY",
     "- country: the single country the document belongs to — where it was " +
