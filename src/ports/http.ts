@@ -4,13 +4,16 @@ export class HttpError extends Error {
   readonly status: number;
   readonly url: string;
   readonly body: string;
+  /** From a Retry-After header in seconds, or null when the server gave none. */
+  readonly retryAfterMs: number | null;
 
-  constructor(status: number, url: string, body: string) {
+  constructor(status: number, url: string, body: string, retryAfterMs: number | null = null) {
     super(`${status} from ${url}: ${body.slice(0, 300)}`);
     this.name = "HttpError";
     this.status = status;
     this.url = url;
     this.body = body;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -23,14 +26,32 @@ export class HttpError extends Error {
  */
 const RETRY_DELAYS_MS = [2_000, 10_000];
 
-/** Worth retrying: rate limits, server-side failures, and connection drops — not 4xx contract errors or our own timeout. */
+/**
+ * A 429 is "slow down", not "broken": Mistral limits requests per minute
+ * (mistral-large-latest was 15/min), so a sweep or a burst of uploads hits it
+ * by design. Seconds-apart retries would all land in the same window, so wait
+ * as long as the server asks, or half a window, and keep at it for a few
+ * minutes. Documents are processed one at a time, so this paces the whole run.
+ */
+const RATE_LIMIT_WAIT_MS = 30_000;
+const RATE_LIMIT_MAX_WAIT_MS = 120_000;
+const RATE_LIMIT_RETRIES = 6;
+
+/** Worth retrying: server-side failures and connection drops — not 4xx contract errors or our own timeout. */
 function isTransient(error: unknown): boolean {
-  if (error instanceof HttpError) return error.status === 429 || error.status >= 500;
+  if (error instanceof HttpError) return error.status >= 500;
   // fetch wraps network failures (reset, refused, DNS) in TypeError. An
   // AbortError from our own timeout is deliberately not retried: the timeouts
   // are generous, so repeating one only multiplies the wait.
   return error instanceof TypeError;
 }
+
+function parseRetryAfter(header: string | null): number | null {
+  const seconds = Number(header ?? "");
+  return header && Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function requestJson(
   url: string,
@@ -39,15 +60,25 @@ export async function requestJson(
     token?: string;
     method?: string;
     timeoutMs?: number;
-    /** Test seam; production callers keep the default. */
+    /** Test seams; production callers keep the defaults. */
     retryDelaysMs?: number[];
+    rateLimitWaitMs?: number;
   } = {},
 ): Promise<any> {
-  const { payload, token, method, timeoutMs = 180_000, retryDelaysMs = RETRY_DELAYS_MS } = options;
+  const {
+    payload,
+    token,
+    method,
+    timeoutMs = 180_000,
+    retryDelaysMs = RETRY_DELAYS_MS,
+    rateLimitWaitMs = RATE_LIMIT_WAIT_MS,
+  } = options;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  for (let attempt = 0; ; attempt++) {
+  let failures = 0;
+  let rateLimited = 0;
+  for (;;) {
     try {
       const response = await fetch(url, {
         method: method ?? (payload !== undefined ? "POST" : "GET"),
@@ -56,11 +87,19 @@ export async function requestJson(
         signal: AbortSignal.timeout(timeoutMs),
       });
       const text = await response.text();
-      if (!response.ok) throw new HttpError(response.status, url, text);
+      if (!response.ok) {
+        const retryAfter = parseRetryAfter(response.headers.get("retry-after"));
+        throw new HttpError(response.status, url, text, retryAfter);
+      }
       return text.trim() ? JSON.parse(text) : {};
     } catch (error) {
-      if (attempt >= retryDelaysMs.length || !isTransient(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[attempt]));
+      if (error instanceof HttpError && error.status === 429) {
+        if (rateLimited++ >= RATE_LIMIT_RETRIES) throw error;
+        await sleep(Math.min(error.retryAfterMs ?? rateLimitWaitMs, RATE_LIMIT_MAX_WAIT_MS));
+        continue;
+      }
+      if (failures >= retryDelaysMs.length || !isTransient(error)) throw error;
+      await sleep(retryDelaysMs[failures++]);
     }
   }
 }

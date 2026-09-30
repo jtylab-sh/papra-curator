@@ -6,7 +6,9 @@ import { createServer, type Server } from "node:http";
 import { requestJson, HttpError } from "#~/ports/http.ts";
 
 /** One server per scripted list of responses; `null` means drop the connection. */
-function serveScript(script: ({ status: number; body: string } | null)[]): {
+type Step = { status: number; body: string; headers?: Record<string, string> } | null;
+
+function serveScript(script: Step[]): {
   server: Server;
   url: () => string;
   hits: () => number;
@@ -19,7 +21,7 @@ function serveScript(script: ({ status: number; body: string } | null)[]): {
       request.socket.destroy();
       return;
     }
-    response.writeHead(step.status, { "Content-Type": "application/json" });
+    response.writeHead(step.status, { "Content-Type": "application/json", ...step.headers });
     response.end(step.body);
   });
   return {
@@ -29,7 +31,7 @@ function serveScript(script: ({ status: number; body: string } | null)[]): {
   };
 }
 
-const NO_WAIT = { retryDelaysMs: [0, 0] };
+const NO_WAIT = { retryDelaysMs: [0, 0], rateLimitWaitMs: 0 };
 
 describe("requestJson retries", () => {
   const servers: Server[] = [];
@@ -37,7 +39,7 @@ describe("requestJson retries", () => {
     for (const server of servers) server.close();
   });
 
-  async function start(script: ({ status: number; body: string } | null)[]) {
+  async function start(script: Step[]) {
     const scripted = serveScript(script);
     servers.push(scripted.server);
     await new Promise<void>((resolve) => scripted.server.listen(0, "127.0.0.1", resolve));
@@ -78,5 +80,31 @@ describe("requestJson retries", () => {
     const answer = await requestJson(scripted.url(), NO_WAIT);
     assert.deepEqual(answer, { ok: 1 });
     assert.equal(scripted.hits(), 2);
+  });
+
+  it("keeps waiting out a 429 past the transient retry budget", async () => {
+    const limited = { status: 429, body: "rate limit exceeded" };
+    const scripted = await start([limited, limited, limited, limited, { status: 200, body: "{}" }]);
+    await requestJson(scripted.url(), NO_WAIT);
+    assert.equal(scripted.hits(), 5, "a rate limit is not a failure: more tries than a 503 gets");
+  });
+
+  it("waits as long as Retry-After asks instead of the default", async () => {
+    const scripted = await start([
+      { status: 429, body: "slow down", headers: { "Retry-After": "0" } },
+      { status: 200, body: '{"ok":true}' },
+    ]);
+    const started = Date.now();
+    await requestJson(scripted.url(), { ...NO_WAIT, rateLimitWaitMs: 60_000 });
+    assert.ok(Date.now() - started < 5_000, "Retry-After: 0 must not wait the 60 s default");
+  });
+
+  it("gives up when the rate limit never clears", async () => {
+    const scripted = await start([{ status: 429, body: "rate limit exceeded" }]);
+    await assert.rejects(
+      () => requestJson(scripted.url(), NO_WAIT),
+      (error: unknown) => error instanceof HttpError && error.status === 429,
+    );
+    assert.equal(scripted.hits(), 7, "initial attempt plus six rate-limit retries");
   });
 });
