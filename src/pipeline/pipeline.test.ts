@@ -464,7 +464,8 @@ describe("replacing tags", () => {
   // An earlier run, at an older prompt version, applied `banca`.
   const ranBefore = () =>
     state.setStage("doc1", "tagging", "done", "0", { result: { tags: ["banca"] } });
-  const run = (options = {}) => processDocument(config(), state, ports, "doc1", document(), options);
+  const run = (options = {}) =>
+    processDocument(config(), state, ports, "doc1", document(), options);
 
   it("removes its own tag it no longer chooses and keeps tags it never applied", async () => {
     await ranBefore();
