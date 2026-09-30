@@ -175,6 +175,14 @@ export class PapraWriter {
     });
   }
 
+  async removeTag(docId: string, tagId: string): Promise<void> {
+    await requestJson(`${papraBase(this.config)}/documents/${docId}/tags/${tagId}`, {
+      method: "DELETE",
+      token: this.apiKey,
+      timeoutMs: 60_000,
+    });
+  }
+
   async createTag(name: string, description = ""): Promise<string | null> {
     const answer = await requestJson(`${papraBase(this.config)}/tags`, {
       payload: { name, description },

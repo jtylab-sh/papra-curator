@@ -83,6 +83,7 @@ export class FakePorts implements Ports {
   modelCalls: string[] = [];
   systemPrompts: string[] = [];
   appliedTags: string[] = [];
+  removedTags: string[] = [];
   createdTags: string[] = [];
   renames: { docId: string; name: string }[] = [];
   documentDates: { docId: string; date: string }[] = [];
@@ -116,6 +117,9 @@ export class FakePorts implements Ports {
   }
   async applyTag(_docId: string, tagId: string): Promise<void> {
     this.appliedTags.push(tagId);
+  }
+  async removeTag(_docId: string, tagId: string): Promise<void> {
+    this.removedTags.push(tagId);
   }
   async createTag(name: string): Promise<string | null> {
     this.createdTags.push(name);

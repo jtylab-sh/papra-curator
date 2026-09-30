@@ -448,3 +448,59 @@ describe("untagged marker", () => {
     assert.ok(ports.logs.some((line) => line.includes("could not apply untagged")));
   });
 });
+
+describe("replacing tags", () => {
+  let state: State;
+  let ports: FakePorts;
+
+  beforeEach(async () => {
+    state = await State.open("file::memory:");
+    await createSchema(state);
+    ports = new FakePorts();
+    ports.tags.push({ id: "t-casa", name: "casa", description: "" });
+    ports.tags.push({ id: "t-untagged", name: "untagged", description: "" });
+  });
+
+  // An earlier run, at an older prompt version, applied `banca`.
+  const ranBefore = () =>
+    state.setStage("doc1", "tagging", "done", "0", { result: { tags: ["banca"] } });
+  const run = (options = {}) => processDocument(config(), state, ports, "doc1", document(), options);
+
+  it("removes its own tag it no longer chooses and keeps tags it never applied", async () => {
+    await ranBefore();
+    ports.existingDocumentTags = ["banca", "cheatsheet"];
+    ports.answers["catalogue"] = catalogueAnswer(["casa"]);
+    await run();
+    assert.deepEqual(ports.removedTags, ["t-banca"]);
+    assert.deepEqual(ports.appliedTags, ["t-casa"], "cheatsheet was added by hand: untouched");
+  });
+
+  it("keeps its own tag when it chooses it again", async () => {
+    await ranBefore();
+    ports.existingDocumentTags = ["banca"];
+    ports.answers["catalogue"] = catalogueAnswer(["banca", "casa"]);
+    await run();
+    assert.deepEqual(ports.removedTags, []);
+    assert.deepEqual(ports.appliedTags, ["t-casa"]);
+  });
+
+  it("still knows its tags after a failed attempt", async () => {
+    await ranBefore();
+    ports.existingDocumentTags = ["banca"];
+    ports.failOn["catalogue"] = "429 rate limited";
+    await run();
+    delete ports.failOn["catalogue"];
+    ports.answers["catalogue"] = catalogueAnswer([]);
+    await run();
+    assert.deepEqual(ports.removedTags, ["t-banca"], "the error row must not forget ownership");
+    assert.deepEqual(ports.appliedTags, ["t-untagged"], "left with nothing of its own: marked");
+  });
+
+  it("removes nothing on a dry run", async () => {
+    await ranBefore();
+    ports.existingDocumentTags = ["banca"];
+    ports.answers["catalogue"] = catalogueAnswer(["casa"]);
+    await run({ dryRun: true });
+    assert.deepEqual(ports.removedTags, []);
+  });
+});

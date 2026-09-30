@@ -107,7 +107,9 @@ AUTO_TAGGING_ENABLED: "false"
 
 A document whose extracted text later changes (late OCR, a content repair
 through Papra's API) is detected by content hash and re-runs every stage on
-the next webhook or sweep. Re-runs only ever ADD tags, never remove them.
+the next webhook or sweep. A re-run replaces the curator's own tags: a tag it
+applied last time and no longer chooses comes off. Tags it never applied, such
+as ones you added by hand, are never touched.
 
 Sweeps are idempotent — already-processed documents cost nothing — so backfill
 in batches and repeat the same command freely. `--limit N` counts documents

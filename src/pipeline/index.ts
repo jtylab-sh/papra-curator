@@ -30,6 +30,8 @@ export interface RunOptions {
 
 export interface CatalogueResult {
   applied: string[];
+  /** Tags this service applied on an earlier run and took off because it no longer chose them. */
+  removed: string[];
   proposed: string | null;
   /** Country filed into the configured custom property, or null when none was written. */
   country: string | null;
@@ -65,9 +67,15 @@ export async function runTaggingAndRename(
   );
 
   const applied: string[] = [];
+  const removed: string[] = [];
   if (config.tagging.enabled) {
     const chosen = [...new Set(answer?.tags ?? [])].slice(0, config.tagging.maxTags);
     const already = new Set(ports.documentTags(doc.id));
+    // A run replaces this service's own tags: whatever it applied last time and
+    // no longer chooses comes off. Tags it never applied (added by hand, or by
+    // an older tagger) are not its to remove.
+    const previous = await state.stageRow(doc.id, "tagging");
+    const owned = new Set((previous?.result as { tags?: string[] } | null)?.tags ?? []);
 
     for (const tagName of chosen) {
       if (already.has(tagName)) {
@@ -90,7 +98,7 @@ export async function runTaggingAndRename(
       if (!dryRun) await ports.applyTag(doc.id, tagId);
       applied.push(tagName);
     }
-    if (applied.length === 0 && already.size === 0) {
+    if (applied.length === 0 && [...already].every((tagName) => owned.has(tagName))) {
       // Nothing fit and nobody tagged it by hand: mark it, so documents the
       // model could not place are findable instead of looking untouched.
       // The tag is created on first use (needs the tags:create permission);
@@ -98,13 +106,21 @@ export async function runTaggingAndRename(
       try {
         const untaggedId =
           idByName.get(UNTAGGED) ?? (dryRun ? null : await ports.createTag(UNTAGGED));
-        if (!dryRun && untaggedId) await ports.applyTag(doc.id, untaggedId);
+        if (!dryRun && untaggedId && !already.has(UNTAGGED)) {
+          await ports.applyTag(doc.id, untaggedId);
+        }
         if (untaggedId || dryRun) applied.push(UNTAGGED);
       } catch (error) {
         ports.log(
           `  ${doc.name.slice(0, 50)}: could not apply ${UNTAGGED}: ${(error as Error).message}`,
         );
       }
+    }
+    for (const tagName of owned) {
+      const tagId = idByName.get(tagName);
+      if (applied.includes(tagName) || !already.has(tagName) || tagId === undefined) continue;
+      if (!dryRun) await ports.removeTag(doc.id, tagId);
+      removed.push(tagName);
     }
     await state.setStage(doc.id, "tagging", "done", config.tagging.promptVersion, {
       result: { tags: applied },
@@ -176,7 +192,7 @@ export async function runTaggingAndRename(
     );
   }
 
-  return { applied, proposed, renamed, country: filedCountry, date: filedDate };
+  return { applied, removed, proposed, renamed, country: filedCountry, date: filedDate };
 }
 
 /**
@@ -275,9 +291,14 @@ export async function processDocument(
       result.renamed = catalogue.renamed;
       result.proposed = catalogue.proposed;
       ports.log(
-        `  ${doc.name.slice(0, 44).padEnd(46)} tags=${applied.join(",") || "-"}  name=${catalogue.proposed ?? "-"}`,
+        `  ${doc.name.slice(0, 44).padEnd(46)} tags=${applied.join(",") || "-"}` +
+          (catalogue.removed.length ? `  removed=${catalogue.removed.join(",")}` : "") +
+          `  name=${catalogue.proposed ?? "-"}`,
       );
       if (config.notify.onTagged && applied.length > 0) lines.push(`tags: ${applied.join(", ")}`);
+      if (config.notify.onTagged && catalogue.removed.length > 0) {
+        lines.push(`removed: ${catalogue.removed.join(", ")}`);
+      }
       if (config.notify.onTagged && catalogue.country) lines.push(`country: ${catalogue.country}`);
       if (config.notify.onTagged && catalogue.date) lines.push(`date: ${catalogue.date}`);
       if (config.notify.onRenamed && catalogue.renamed) {

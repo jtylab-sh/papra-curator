@@ -126,13 +126,17 @@ export class State {
   ): Promise<void> {
     if (options.dryRun) return;
     const previous = await this.stageRow(docId, stage);
+    // An error keeps the last result: tagging reads it to know which tags are
+    // its own to replace, and a 429 must not make it forget them.
+    const kept = status === "error" ? (previous?.result ?? null) : null;
+    const result = options.result === undefined ? kept : options.result;
     const row = {
       status,
       promptVersion,
       doneAt: new Date(),
       attempts: (previous?.attempts ?? 0) + 1,
       lastError: options.error ?? null,
-      result: options.result === undefined ? null : JSON.stringify(options.result),
+      result: result === null ? null : JSON.stringify(result),
     };
     await this.prisma.stage.upsert({
       where: { docId_stage: { docId, stage } },

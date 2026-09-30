@@ -27,6 +27,7 @@ export interface Ports {
   listTags(): Tag[];
   documentTags(docId: string): string[];
   applyTag(docId: string, tagId: string): Promise<void>;
+  removeTag(docId: string, tagId: string): Promise<void>;
   createTag(name: string, description?: string): Promise<string | null>;
   renameDocument(docId: string, newName: string): Promise<void>;
   setDocumentDate(docId: string, isoDate: string): Promise<void>;
@@ -100,6 +101,7 @@ export function createPorts(
     listTags: () => reader.tags(),
     documentTags: (docId) => reader.documentTags(docId),
     applyTag: (docId, tagId) => writer.applyTag(docId, tagId),
+    removeTag: (docId, tagId) => writer.removeTag(docId, tagId),
     createTag: (name, description) => writer.createTag(name, description),
     renameDocument: (docId, newName) => writer.renameDocument(docId, newName),
     setDocumentDate: (docId, isoDate) => writer.setDocumentDate(docId, isoDate),
