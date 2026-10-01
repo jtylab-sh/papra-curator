@@ -56,6 +56,11 @@ export function cataloguePrompt(
       "OCR text and must return both its tags and the fields used to build its " +
       "filename, in one answer, so the two always agree.",
     "",
+    "The document name you are given is usually the path it was uploaded from " +
+      "(a folder like Family_<person> or Companies_<employer>), which often says " +
+      "whose document it is or which employer it belongs to. Use it, but when it " +
+      "disagrees with the text, the text wins: a file can be in the wrong folder.",
+    "",
     "Available tags:",
     ...vocabulary,
     "",
