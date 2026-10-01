@@ -110,6 +110,10 @@ export function cataloguePrompt(
       "'visita neurologica', 'rx torace', 'amoxicillina'. If it prescribes " +
       "several, use the first. Party is 'ssn' for any national or regional " +
       "health service prescription (SSN, SSR, Regione Lombardia).",
+    "- For a medical report or result (referto: lab results, imaging, visit " +
+      "report), doctype is 'referto' and detail is ALWAYS the exam or visit it " +
+      "reports: 'esami sangue', 'rx torace', 'visita gastroenterologica'. Party " +
+      "is the clinic, lab or hospital, one or two words.",
     "",
     "COUNTRY",
     "- country: the single country the document belongs to — where it was " +
