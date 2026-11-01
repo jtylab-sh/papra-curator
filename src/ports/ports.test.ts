@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { createPorts, SpendBlockedError } from "#~/ports/index.ts";
+import { answerText, createPorts, SpendBlockedError } from "#~/ports/index.ts";
 import { CONFIG_TOML, config } from "#~/testing/helpers.ts";
 import { parseConfig } from "#~/config/index.ts";
 
@@ -52,5 +52,19 @@ describe("spend brake", () => {
       },
     );
     await assert.rejects(() => ports.askModel("catalogue", "s", "u", {}), SpendBlockedError);
+  });
+});
+
+describe("answerText", () => {
+  it("passes a plain string answer through", () => {
+    assert.equal(answerText('{"a":1}'), '{"a":1}');
+  });
+
+  it("keeps only the text chunks of a reasoning answer", () => {
+    const content = [
+      { type: "thinking", thinking: [{ type: "text", text: "hmm {" }] },
+      { type: "text", text: '{"a":1}' },
+    ];
+    assert.deepEqual(JSON.parse(answerText(content)), { a: 1 });
   });
 });

@@ -210,8 +210,9 @@ sources.
 | `[trigger] listen_port`                  | `8099`               | webhook port                                                                                        |
 | `[trigger] reconcile_interval_seconds`   | `0`                  | periodic sweep; `0` = off, first sweep one interval after start                                     |
 | `[model] spend`                          | `false`              | master switch: no model call while false                                                            |
-| `[model] name`                           | — (required)         | Mistral model, e.g. `mistral-medium-latest`                                                         |
+| `[model] name`                           | — (required)         | Mistral model, e.g. `mistral-large-4`                                                               |
 | `[model] temperature`                    | `0.0`                | sampling temperature                                                                                |
+| `[model] reasoning_effort`               | `""`                 | `low`/`medium`/`high` for a reasoning model; `""` sends nothing                                     |
 | `[model] max_attempts`                   | `3`                  | retries per stage before a document is parked with an error                                         |
 | `[tagging] enabled`                      | `true`               | tag documents                                                                                       |
 | `[tagging] prompt_version`               | — (required)         | bump to re-tag everything on the next sweep                                                         |

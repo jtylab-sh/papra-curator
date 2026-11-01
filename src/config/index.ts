@@ -37,6 +37,7 @@ export interface Config {
     name: string;
     spend: boolean;
     temperature: number;
+    reasoningEffort: string;
     maxAttempts: number;
   };
   tagging: {
@@ -174,6 +175,7 @@ export function parseConfig(text: string): Config {
       // fresh install cannot spend anything.
       spend: bool(model, "spend", "model", false),
       temperature: num(model, "temperature", "model", 0),
+      reasoningEffort: str(model, "reasoning_effort", "model", ""),
       maxAttempts: num(model, "max_attempts", "model", 3),
     },
     tagging: {

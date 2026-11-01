@@ -68,6 +68,18 @@ export class SpendBlockedError extends Error {
   }
 }
 
+/**
+ * A reasoning model answers with a list of chunks (thinking, then text); the
+ * JSON is in the text chunks. Older models answer with a plain string.
+ */
+export function answerText(content: string | { type: string; text?: string }[]): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter((chunk) => chunk.type === "text")
+    .map((chunk) => chunk.text)
+    .join("");
+}
+
 export function createPorts(
   config: Config,
   secrets: { mistralKey: string; papraApiKey: string; airtrailKey: string },
@@ -92,10 +104,14 @@ export function createPorts(
             json_schema: { name: _label, schema, strict: true },
           },
           temperature: config.model.temperature,
+          // Greedy sampling (temperature 0) is refused unless top_p is 1, and
+          // Large 4's default is not 1.
+          top_p: 1,
+          ...(config.model.reasoningEffort && { reasoning_effort: config.model.reasoningEffort }),
         },
         token: secrets.mistralKey,
       });
-      return JSON.parse(answer.choices[0].message.content);
+      return JSON.parse(answerText(answer.choices[0].message.content));
     },
 
     listTags: () => reader.tags(),
